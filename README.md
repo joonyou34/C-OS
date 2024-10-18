@@ -41,12 +41,12 @@ FOS needs an Linux environment to run as expected. For Windows users, the method
 
 1. **Linux-like Environment:**
 
-   - [Download][dl-cygwin-32] and Install [**Cygwin**][cygwin] **_32-bit_**.
-   - Copy **`setup-x86.exe`** to **`C:\cygwin`**.
-   - Open a terminal in **`C:\cygwin`** and type:  
+   - [Download][dl-cygwin-64] and Install [**Cygwin**][cygwin] **_64-bit_**.
+   - Copy **`setup-x86_64.exe`** to **`C:\cygwin64`**.
+   - Open a terminal in **`C:\cygwin64`** and type:  
      <br />
      ```cmd
-     ./setup-x86.exe -q -P gdb,make,perl
+     ./setup-x86_64.exe -q -P gdb,make,perl
      ```
 
 1. **Toolchain:**
@@ -65,12 +65,12 @@ FOS needs an Linux environment to run as expected. For Windows users, the method
 
      ```path
      C:\Program Files\qemu
-     C:\cygwin\bin
-     C:\cygwin\opt\cross\bin
+     C:\cygwin64\bin
+     C:\cygwin64\opt\cross\bin
      ```
 
 [cygwin]: https://cygwin.com/
-[dl-cygwin-32]: https://cygwin.com/install.html
+[dl-cygwin-64]: https://cygwin.com/install.html
 [dl-toolchain]: https://github.com/YoussefRaafatNasry/fos-v2/releases/tag/toolchain
 [qemu]: https://www.qemu.org/
 [dl-qemu]: https://qemu.weilnetz.de/w64/2020/
