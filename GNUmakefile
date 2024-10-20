@@ -9,10 +9,12 @@
 V 			:= @
 TOP 		:= .
 OBJDIR 		:= obj
-TOOLPREFIX 	:= i386-elf-
+TOOLPREFIX 	:= /opt/cross/bin/i386-elf-
 QEMU 		:= qemu-system-i386
 PERL		:= perl
 IMAGE 		:= $(OBJDIR)/fos.img
+LOGSDIR 	:= logs
+LOGFILE 	:= $(shell date --iso-8601)
 
 CC			:= $(TOOLPREFIX)gcc -m32 -pipe
 GCC_LIB 	:= $(shell $(CC) -print-libgcc-file-name)
@@ -37,6 +39,7 @@ OBJDIRS :=
 
 # Make sure that 'all' is the first target
 all:
+	$(V)mkdir -p $(LOGSDIR)
 
 # Eliminate default suffix rules
 .SUFFIXES:
@@ -51,8 +54,8 @@ all:
 	$(OBJDIR)/lib/%.o \
 	$(OBJDIR)/user/%.o
 
-KERN_CFLAGS := $(CFLAGS) -DFOS_KERNEL -gstabs
-USER_CFLAGS := $(CFLAGS) -DFOS_USER -gstabs
+KERN_CFLAGS := $(CFLAGS) -DFOS_KERNEL
+USER_CFLAGS := $(CFLAGS) -DFOS_USER
 
 
 # Include Makefrags for subdirectories
@@ -64,15 +67,14 @@ include user/Makefrag
 
 # Emulators
 
-GDBPORT 	= 26000
-QEMUGDB 	= -gdb tcp::$(GDBPORT)
-QEMUOPTS 	= -drive file=$(IMAGE),media=disk,format=raw -smp 2 -m 32 $(QEMUEXTRAS)
+QEMUEXTRAS	= -chardev stdio,id=char0,mux=on,logfile=$(LOGSDIR)/$(LOGFILE).log,logappend=on -parallel chardev:char0
+QEMUOPTS 	= -drive file=$(IMAGE),media=disk,format=raw -smp 1 -m 256 $(QEMUEXTRAS)
 
 qemu: all
-	$(V)$(QEMU) -serial mon:stdio $(QEMUOPTS)
+	$(V)$(QEMU) $(QEMUOPTS)
 
 qemu-gdb: all
-	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+	$(QEMU) $(QEMUOPTS) -S -s
 
 
 # For deleting the build
