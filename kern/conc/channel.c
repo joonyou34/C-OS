@@ -26,15 +26,32 @@ void init_channel(struct Channel *chan, char *name)
 // Atomically release lock and sleep on chan.
 // Reacquires lock when awakened.
 // Ref: xv6-x86 OS code
-void sleep(struct Channel *chan, struct spinlock* lk)
+void sleep(struct Channel *chan, struct spinlock *lk)
 {
-	//TODO: [PROJECT'24.MS1 - #10] [4] LOCKS - sleep
-	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("sleep is not implemented yet");
-	//Your Code is Here...
+	// TODO: [PROJECT'24.MS1 - #10] [4] LOCKS - sleep
+	// COMMENT THE FOLLOWING LINE BEFORE START CODING
+	//  panic("sleep is not implemented yet");
+	// Your Code is Here...
 
+	if (!holding_spinlock(lk))
+		panic("lock not held by current process");
+
+	struct Env *current_proc = get_cpu_proc();
+
+	// release the given lk before being blocked so that other process(es) can use it
+	release_spinlock(lk);
+
+	current_proc->env_status = ENV_BLOCKED;
+
+	// add process to channel's queue
+	enqueue(&chan->queue, current_proc);
+
+	// schedule a next ready process
+	sched();
+
+	// reacquire the given lk again when awakened
+	acquire_spinlock(lk);
 }
-
 //==================================================
 // 3) WAKEUP ONE BLOCKED PROCESS ON A GIVEN CHANNEL:
 //==================================================
@@ -44,10 +61,10 @@ void sleep(struct Channel *chan, struct spinlock* lk)
 // chan MUST be of type "struct Env_Queue" to hold the blocked processes
 void wakeup_one(struct Channel *chan)
 {
-	//TODO: [PROJECT'24.MS1 - #11] [4] LOCKS - wakeup_one
-	//COMMENT THE FOLLOWING LINE BEFORE START CODING
+	// TODO: [PROJECT'24.MS1 - #11] [4] LOCKS - wakeup_one
+	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	panic("wakeup_one is not implemented yet");
-	//Your Code is Here...
+	// Your Code is Here...
 }
 
 //====================================================
@@ -60,10 +77,8 @@ void wakeup_one(struct Channel *chan)
 
 void wakeup_all(struct Channel *chan)
 {
-	//TODO: [PROJECT'24.MS1 - #12] [4] LOCKS - wakeup_all
-	//COMMENT THE FOLLOWING LINE BEFORE START CODING
+	// TODO: [PROJECT'24.MS1 - #12] [4] LOCKS - wakeup_all
+	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	panic("wakeup_all is not implemented yet");
-	//Your Code is Here...
-
+	// Your Code is Here...
 }
-
