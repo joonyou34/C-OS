@@ -43,11 +43,15 @@ void sleep(struct Channel *chan, struct spinlock *lk)
 
 	current_proc->env_status = ENV_BLOCKED;
 
+	acquire_spinlock(&ProcessQueues.qlock);
+
 	// add process to channel's queue
 	enqueue(&chan->queue, current_proc);
 
 	// schedule a next ready process
 	sched();
+
+	release_spinlock(&ProcessQueues.qlock);
 
 	// reacquire the given lk again when awakened
 	acquire_spinlock(lk);
