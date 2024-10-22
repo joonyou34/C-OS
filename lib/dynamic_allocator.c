@@ -273,8 +273,45 @@ void free_block(void *va)
 {
 	//TODO: [PROJECT'24.MS1 - #07] [3] DYNAMIC ALLOCATOR - free_block
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("free_block is not implemented yet");
+	// panic("free_block is not implemented yet");
 	//Your Code is Here...
+
+	if(va == NULL || is_free_block(va)) return;
+
+	uint32 size = get_block_size(va);
+	set_block_data(va, size, 0);
+
+	char* address = (char *)va;
+	uint32 metadataIt = *((uint32 *)(address - 2*sizeof(int)));
+	uint32 prevSize = 0;
+
+	char* mergedAddress = NULL;
+	if(((metadataIt)&1) == 0) {
+		prevSize = (metadataIt&(~0x1));
+		mergedAddress = address - prevSize;
+		set_block_data(mergedAddress, size + prevSize, 0);
+	}
+
+	char* nxtAddress = ((address + size));
+	if(is_free_block(nxtAddress)) {
+		if(mergedAddress == NULL)  {
+			LIST_INSERT_BEFORE(&freeBlocksList, (struct BlockElement *) nxtAddress, (struct BlockElement *)address);
+			mergedAddress = address;
+		}
+		LIST_REMOVE(&freeBlocksList, (struct BlockElement *)nxtAddress);
+		set_block_data(mergedAddress, size + get_block_size(nxtAddress) + prevSize, 0);
+	}
+	if(mergedAddress != NULL)
+		return;
+
+	struct BlockElement* it;
+	LIST_FOREACH(it, &freeBlocksList) {
+		if((char *)it > address) {
+			LIST_INSERT_BEFORE(&freeBlocksList, it, (struct BlockElement *)address);
+			return;
+		}
+	}
+	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement *)address);
 }
 
 //=========================================
