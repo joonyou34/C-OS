@@ -149,6 +149,30 @@ void* sbrkBytes(uint32 sz) {
 	// return sbrk(ROUNDUP(sz, PAGE_SIZE)/PAGE_SIZE);
 }
 
+void insert_free_block(void* va)
+{
+	struct BlockElement* it;
+	LIST_FOREACH(it, &freeBlocksList)
+	{
+		if((char*)it > (char*)va) {
+			LIST_INSERT_BEFORE(&freeBlocksList, it, (struct BlockElement*)va);
+			return;
+		}
+	}
+	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement *)va);
+}
+
+void* split_block(void* va, uint32 sze, uint32 rem_sze)
+{
+	void* new_free_block = ((char*)va + sze);
+	set_block_data(new_free_block, rem_sze, 0);
+	
+	insert_free_block(new_free_block);
+	
+	return (void*) new_free_block;
+}
+
+
 
 //=========================================
 // [3] ALLOCATE BLOCK BY FIRST FIT:
@@ -305,14 +329,7 @@ void free_block(void *va)
 	if(mergedAddress != NULL)
 		return;
 
-	struct BlockElement* it;
-	LIST_FOREACH(it, &freeBlocksList) {
-		if((char *)it > address) {
-			LIST_INSERT_BEFORE(&freeBlocksList, it, (struct BlockElement *)address);
-			return;
-		}
-	}
-	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement *)address);
+	insert_free_block(address);
 }
 
 //=========================================
@@ -326,30 +343,36 @@ void *realloc_block_FF(void* va, uint32 new_size)
 	//panic("realloc_block_FF is not implemented yet");
 	//Your Code is Here...
 
+	if(va == NULL){
+
+		if(new_size == 0)
+			return NULL;
+
+		return alloc_block_FF(new_size);
+	}
+
 	if(new_size==0){
 		free_block(va);
 		return NULL;
 	}
-	if(va == NULL){
-		return alloc_block_FF(new_size);
-	}
+
+	new_size += sizeof(int)*2;
 	
 	uint32 current_size = get_block_size(va);
-
-	if(current_size > new_size){
-		set_block_data(va,new_size,1);
-
+	
+	if(current_size > new_size) /*SHRINK*/
+	{
 		uint32 rem_size = current_size - new_size;
 
-		if(rem_size >= DYN_ALLOC_MIN_BLOCK_SIZE)
+		if(rem_size >= sizeof(int)*4)
 		{	
-			void* new_free_block = ((char*)va + new_size);
-        	set_block_data(new_free_block, rem_size, 0);
-        	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement*)new_free_block);
+			split_block(va, new_size, rem_size);
+			set_block_data(va, new_size, 1);
 		}
+
 		return va;
 	}
-	else if(current_size < new_size)
+	else if(current_size < new_size) /*ENLARGE*/
 	{
 		char* nxtAddress = (((char*)va + current_size));
 		if(is_free_block(nxtAddress)){
@@ -357,34 +380,39 @@ void *realloc_block_FF(void* va, uint32 new_size)
 			uint32 total_available_size = current_size+nxt_size;
 			if(total_available_size >= new_size)
 			{
+				LIST_REMOVE(&freeBlocksList, (struct BlockElement*)nxtAddress);
 				set_block_data(va,new_size,1);
 
 				uint32 rem_size = total_available_size - new_size;
 	
-				if(rem_size >= DYN_ALLOC_MIN_BLOCK_SIZE)
+				if(rem_size >= sizeof(int)*4)
 				{
-					void* new_free_block = ((char*)va + new_size);
-					set_block_data(new_free_block, rem_size, 0);
-					LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement*)new_free_block);
+					split_block(va, new_size, rem_size);
 				}
+				else
+				{
+					new_size = total_available_size;
+				}
+
+				set_block_data(va, new_size, 1);
 
 				return va;
 			}
 		}
-	}
-	else
-	{
-		return va;
+		else
+		{
+			void* new_block = alloc_block_FF(new_size);
+			if(new_block==NULL){
+				return NULL;
+			}
+			memcpy(new_block, va, current_size - sizeof(int)*2);
+			
+			free_block(va);
+			return new_block;
+		}
 	}
 
-	void* new_block = alloc_block_FF(new_size);
-	if(new_block==NULL){
-		return NULL;
-	}
-	
-	free_block(va);
-	
-	return new_block;
+	return va;
 }
 
 /*********************************************************************************************/
