@@ -4,7 +4,6 @@
 
 
 #include <kern/cmd/command_prompt.h>
-
 #include <kern/proc/user_environment.h>
 #include <kern/trap/kdebug.h>
 #include <kern/cons/console.h>
@@ -451,18 +450,37 @@ int execute_command(char *command_string)
 	}
 	return 0;
 }
+bool FindSubsequencePLS(const char *sting1 ,const char *sting2){
+	if(sting1 == sting2){
+		sting2++;
+	}
+	sting1++;
 
+	return sting2=='\0';
+}
 
 int process_command(int number_of_arguments, char** arguments)
 {
 	//TODO: [PROJECT'24.MS1 - #01] [1] PLAY WITH CODE! - process_command
+    struct Command *cmd;
+	int i=0;
 
-	for (int i = 0; i < NUM_OF_COMMANDS; i++)
-	{
-		if (strcmp(arguments[0], commands[i].name) == 0)
-		{
-			return i;
+	LIST_FOREACH(cmd,&foundCommands){
+		if(strcmp(cmd->name ,arguments[0],strlen(cmd->name)==0)){
+			if(number_of_arguments == cmd->num_of_args){
+				return i;
+			}else{
+				return  CMD_INV_NUM_ARGS;
+			}
+		}
+		i++;
+	}
+
+	LIST_FOREACH(cmd,&foundCommands){
+		if(FindSubsequencePLS(cmd->name , arguments[0])){
+			return  CMD_MATCHED;
 		}
 	}
+
 	return CMD_INVALID;
 }
