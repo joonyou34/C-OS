@@ -466,7 +466,7 @@ int process_command(int number_of_arguments, char** arguments)
 	int i=0;
 
 	LIST_FOREACH(cmd,&foundCommands){
-		if(strcmp(cmd->name ,arguments[0],strlen(cmd->name)==0)){
+		if(strncmp(cmd->name ,arguments[0],strlen(cmd->name))==0){
 			if(number_of_arguments == cmd->num_of_args){
 				return i;
 			}else{
