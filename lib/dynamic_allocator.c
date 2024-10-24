@@ -103,9 +103,28 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 
 	//TODO: [PROJECT'24.MS1 - #04] [3] DYNAMIC ALLOCATOR - initialize_dynamic_allocator
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("initialize_dynamic_allocator is not implemented yet");
+	// panic("initialize_dynamic_allocator is not implemented yet");
 	//Your Code is Here...
 
+	LIST_INIT(&freeBlocksList);
+	
+	uint32 actualSize = initSizeOfAllocatedSpace-2*sizeof(int);
+	uint32* it = (uint32 *)daStart;
+	//begin block
+	*it = 1;
+	it++;
+	//header
+	*it = actualSize;
+
+	it++;
+	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement *)it);
+
+	it = (uint32 *)(daStart + initSizeOfAllocatedSpace - sizeof(int));
+	//end block
+	*it = 1;
+	it--;
+	//footer
+	*it = actualSize;
 }
 //==================================
 // [2] SET BLOCK HEADER & FOOTER:
@@ -114,8 +133,20 @@ void set_block_data(void* va, uint32 totalSize, bool isAllocated)
 {
 	//TODO: [PROJECT'24.MS1 - #05] [3] DYNAMIC ALLOCATOR - set_block_data
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("set_block_data is not implemented yet");
+	// panic("set_block_data is not implemented yet");
 	//Your Code is Here...
+
+	char* address = (char *)va;
+	//modify header
+	*((uint32*)(address-sizeof(int))) = ((totalSize) | isAllocated);
+	
+	//modify footer
+	*((uint32 *)(address + totalSize - 2*sizeof(int))) = ((totalSize) | isAllocated);
+}
+
+void* sbrkBytes(uint32 sz) {
+	return (void *)-1;
+	// return sbrk(ROUNDUP(sz, PAGE_SIZE)/PAGE_SIZE);
 }
 
 
@@ -144,9 +175,36 @@ void *alloc_block_FF(uint32 size)
 
 	//TODO: [PROJECT'24.MS1 - #06] [3] DYNAMIC ALLOCATOR - alloc_block_FF
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("alloc_block_FF is not implemented yet");
+	// panic("alloc_block_FF is not implemented yet");
 	//Your Code is Here...
 
+	if(size == 0)
+		return NULL;
+	size += 2*sizeof(int);
+	struct BlockElement* it;
+	LIST_FOREACH(it, &freeBlocksList) {
+		uint32 blockSz = get_block_size(it);
+		//first block found
+		if(blockSz >= size) {
+			char* address = (char*) (it);
+			//see if can split
+			if(blockSz-size >= 4*sizeof(int)) {
+				blockSz -= size;
+				struct BlockElement* newBlockPtr = (struct BlockElement*) (address + size);
+				set_block_data(newBlockPtr, blockSz, 0);
+				LIST_INSERT_AFTER(&freeBlocksList, it, newBlockPtr);
+			}
+			else
+				size = blockSz;
+			set_block_data(it, size, 1);
+			LIST_REMOVE(&freeBlocksList, it);
+			return it;
+		}
+	}
+	//REVISE AFTER SBRK
+	if(sbrkBytes(size) == (void*) -1)
+		return NULL;
+	return alloc_block_FF(size - 2*sizeof(int));
 }
 //=========================================
 // [4] ALLOCATE BLOCK BY BEST FIT:
@@ -155,9 +213,57 @@ void *alloc_block_BF(uint32 size)
 {
 	//TODO: [PROJECT'24.MS1 - BONUS] [3] DYNAMIC ALLOCATOR - alloc_block_BF
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("alloc_block_BF is not implemented yet");
+	// panic("alloc_block_BF is not implemented yet");
 	//Your Code is Here...
 
+	{
+		if (size % 2 != 0) size++;	//ensure that the size is even (to use LSB as allocation flag)
+		if (!is_initialized)
+		{
+			uint32 required_size = size + 2*sizeof(int) /*header & footer*/ + 2*sizeof(int) /*da begin & end*/ ;
+			uint32 da_start = (uint32)sbrk(ROUNDUP(required_size, PAGE_SIZE)/PAGE_SIZE);
+			uint32 da_break = (uint32)sbrk(0);
+			initialize_dynamic_allocator(da_start, da_break - da_start);
+		}
+	}
+
+	if(size == 0)
+		return NULL;
+	size += 2*sizeof(int);
+	struct BlockElement* it;
+	struct BlockElement* best = NULL;
+	uint32 mnSz = -1;
+	LIST_FOREACH(it, &freeBlocksList) {
+		uint32 blockSz = get_block_size(it);
+		//candidate block
+		if(blockSz >= size) {
+			if(best == NULL || blockSz < mnSz) {
+				best = it;
+				mnSz = blockSz;
+			}
+		}
+	}
+
+	if(best != NULL) {
+		char* address = (char*) (best);
+			//see if can split
+			if(mnSz-size >= 4*sizeof(int)) {
+				mnSz -= size;
+				struct BlockElement* newBlockPtr = (struct BlockElement*) (address + size);
+				set_block_data(newBlockPtr, mnSz, 0);
+				LIST_INSERT_AFTER(&freeBlocksList, best, newBlockPtr);
+			}
+			else
+				size = mnSz;
+			set_block_data(best, size, 1);
+			LIST_REMOVE(&freeBlocksList, best);
+			return best;
+	}
+
+	//REVISE AFTER SBRK
+	if(sbrkBytes(size) == (void*) -1)
+		return NULL;
+	return alloc_block_FF(size - 2*sizeof(int));
 }
 
 //===================================================
@@ -167,8 +273,45 @@ void free_block(void *va)
 {
 	//TODO: [PROJECT'24.MS1 - #07] [3] DYNAMIC ALLOCATOR - free_block
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("free_block is not implemented yet");
+	// panic("free_block is not implemented yet");
 	//Your Code is Here...
+
+	if(va == NULL || is_free_block(va)) return;
+
+	uint32 size = get_block_size(va);
+	set_block_data(va, size, 0);
+
+	char* address = (char *)va;
+	uint32 metadataIt = *((uint32 *)(address - 2*sizeof(int)));
+	uint32 prevSize = 0;
+
+	char* mergedAddress = NULL;
+	if(((metadataIt)&1) == 0) {
+		prevSize = (metadataIt&(~0x1));
+		mergedAddress = address - prevSize;
+		set_block_data(mergedAddress, size + prevSize, 0);
+	}
+
+	char* nxtAddress = ((address + size));
+	if(is_free_block(nxtAddress)) {
+		if(mergedAddress == NULL)  {
+			LIST_INSERT_BEFORE(&freeBlocksList, (struct BlockElement *) nxtAddress, (struct BlockElement *)address);
+			mergedAddress = address;
+		}
+		LIST_REMOVE(&freeBlocksList, (struct BlockElement *)nxtAddress);
+		set_block_data(mergedAddress, size + get_block_size(nxtAddress) + prevSize, 0);
+	}
+	if(mergedAddress != NULL)
+		return;
+
+	struct BlockElement* it;
+	LIST_FOREACH(it, &freeBlocksList) {
+		if((char *)it > address) {
+			LIST_INSERT_BEFORE(&freeBlocksList, it, (struct BlockElement *)address);
+			return;
+		}
+	}
+	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement *)address);
 }
 
 //=========================================
