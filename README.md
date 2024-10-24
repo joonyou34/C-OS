@@ -52,7 +52,7 @@ FOS needs an Linux environment to run as expected. For Windows users, the method
 1. **Toolchain:**
 
    - [Download][dl-toolchain] the `i386-elf-toolchain` for Windows.
-   - Extract **`i386-elf-toolchain-windows.rar`** in **`C:\cygwin\opt\cross\`** _(create this folder if it doesn't exist)_.
+   - Extract **`i386-elf-toolchain-windows.rar`** in **`C:\cygwin64\opt\cross\`** _(create this folder if it doesn't exist)_.
 
 1. **Emulator:**
 
