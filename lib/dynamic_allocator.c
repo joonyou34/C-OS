@@ -204,6 +204,7 @@ void *alloc_block_FF(uint32 size)
 	//REVISE AFTER SBRK
 	if(sbrkBytes(size) == (void*) -1)
 		return NULL;
+		
 	return alloc_block_FF(size - 2*sizeof(int));
 }
 //=========================================
@@ -320,9 +321,70 @@ void free_block(void *va)
 void *realloc_block_FF(void* va, uint32 new_size)
 {
 	//TODO: [PROJECT'24.MS1 - #08] [3] DYNAMIC ALLOCATOR - realloc_block_FF
+	
 	//COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("realloc_block_FF is not implemented yet");
+	//panic("realloc_block_FF is not implemented yet");
 	//Your Code is Here...
+
+	if(new_size==0){
+		free_block(va);
+		return NULL;
+	}
+	if(va == NULL){
+		return alloc_block_FF(new_size);
+	}
+	
+	uint32 current_size = get_block_size(va);
+
+	if(current_size > new_size){
+		set_block_data(va,new_size,1);
+
+		uint32 rem_size = current_size - new_size;
+
+		if(rem_size >= DYN_ALLOC_MIN_BLOCK_SIZE)
+		{	
+			void* new_free_block = ((char*)va + new_size);
+        	set_block_data(new_free_block, rem_size, 0);
+        	LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement*)new_free_block);
+		}
+		return va;
+	}
+	else if(current_size < new_size)
+	{
+		char* nxtAddress = (((char*)va + current_size));
+		if(is_free_block(nxtAddress)){
+			uint32 nxt_size = get_block_size(nxtAddress);
+			uint32 total_available_size = current_size+nxt_size;
+			if(total_available_size >= new_size)
+			{
+				set_block_data(va,new_size,1);
+
+				uint32 rem_size = total_available_size - new_size;
+	
+				if(rem_size >= DYN_ALLOC_MIN_BLOCK_SIZE)
+				{
+					void* new_free_block = ((char*)va + new_size);
+					set_block_data(new_free_block, rem_size, 0);
+					LIST_INSERT_TAIL(&freeBlocksList, (struct BlockElement*)new_free_block);
+				}
+
+				return va;
+			}
+		}
+	}
+	else
+	{
+		return va;
+	}
+
+	void* new_block = alloc_block_FF(new_size);
+	if(new_block==NULL){
+		return NULL;
+	}
+	
+	free_block(va);
+	
+	return new_block;
 }
 
 /*********************************************************************************************/

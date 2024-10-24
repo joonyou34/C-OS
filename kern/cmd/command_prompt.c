@@ -450,37 +450,55 @@ int execute_command(char *command_string)
 	}
 	return 0;
 }
-bool FindSubsequencePLS(const char *sting1 ,const char *sting2){
-	if(sting1 == sting2){
-		sting2++;
-	}
-	sting1++;
 
-	return sting2=='\0';
+bool FindSubsequencePLS(const char *sting1 ,const char *sting2){
+    while(*sting1 != '\0' && sting2 !='\0'){
+        if(*sting1 == *sting2){
+            sting2++;
+        }
+        sting1++;
+    }
+
+    return *sting2=='\0';
 }
 
-int process_command(int number_of_arguments, char** arguments)
+int process_command(int number_of_arguments, char **arguments)
 {
-	//TODO: [PROJECT'24.MS1 - #01] [1] PLAY WITH CODE! - process_command
-    struct Command *cmd;
-	int i=0;
+    // TODO: [PROJECT'24.MS1 - #01] [1] PLAY WITH CODE! - process_command
+	LIST_INIT(&foundCommands);
 
-	LIST_FOREACH(cmd,&foundCommands){
-		if(strncmp(cmd->name ,arguments[0],strlen(cmd->name))==0){
-			if(number_of_arguments == cmd->num_of_args){
-				return i;
-			}else{
-				return  CMD_INV_NUM_ARGS;
-			}
-		}
-		i++;
-	}
+    for (int i = 0; i < NUM_OF_COMMANDS; i++)
+    {
+        if (strcmp(arguments[0], commands[i].name) == 0)
+        {
+            if(commands[i].num_of_args == -1 && number_of_arguments >= 2)
+            {
+                return i;
+            }
+            else if (number_of_arguments - 1 == commands[i].num_of_args)
+            {
+                return i;
+            }
+            else
+            {
+                LIST_INSERT_HEAD(&foundCommands, &commands[i]);
+                return CMD_INV_NUM_ARGS;
+            }
+        }
+    }
 
-	LIST_FOREACH(cmd,&foundCommands){
-		if(FindSubsequencePLS(cmd->name , arguments[0])){
-			return  CMD_MATCHED;
-		}
-	}
+    for (int i = 0; i < NUM_OF_COMMANDS; i++)
+    {
+        if (FindSubsequencePLS(commands[i].name, arguments[0]))
+        {
+            LIST_INSERT_HEAD(&foundCommands, &commands[i]);
+        }
+    }
 
-	return CMD_INVALID;
+    if (LIST_SIZE(&foundCommands) != 0)
+    {
+        return CMD_MATCHED;
+    }
+
+    return CMD_INVALID;
 }
