@@ -375,34 +375,31 @@ void *realloc_block_FF(void* va, uint32 new_size)
 	else if(current_size < new_size) /*ENLARGE*/
 	{
 		char* nxtAddress = (((char*)va + current_size));
-		if(is_free_block(nxtAddress)){
-			uint32 nxt_size = get_block_size(nxtAddress);
-			uint32 total_available_size = current_size+nxt_size;
-			if(total_available_size >= new_size)
+		if(is_free_block(nxtAddress) && current_size + get_block_size(nxtAddress) >= new_size){
+			LIST_REMOVE(&freeBlocksList, (struct BlockElement*)nxtAddress);
+			set_block_data(va,new_size,1);
+			uint32 total_available_size = current_size + get_block_size(nxtAddress);
+			uint32 rem_size = total_available_size - new_size;
+
+			if(rem_size >= sizeof(int)*4)
 			{
-				LIST_REMOVE(&freeBlocksList, (struct BlockElement*)nxtAddress);
-				set_block_data(va,new_size,1);
-
-				uint32 rem_size = total_available_size - new_size;
-	
-				if(rem_size >= sizeof(int)*4)
-				{
-					split_block(va, new_size, rem_size);
-				}
-				else
-				{
-					new_size = total_available_size;
-				}
-
-				set_block_data(va, new_size, 1);
-
-				return va;
+				split_block(va, new_size, rem_size);
 			}
+			else
+			{
+				new_size = total_available_size;
+			}
+
+			set_block_data(va, new_size, 1);
+
+			return va;
+			
 		}
 		else
 		{
 			void* new_block = alloc_block_FF(new_size);
 			if(new_block==NULL){
+				free_block(va);
 				return NULL;
 			}
 			memcpy(new_block, va, current_size - sizeof(int)*2);
@@ -411,7 +408,7 @@ void *realloc_block_FF(void* va, uint32 new_size)
 			return new_block;
 		}
 	}
-
+	//when curr_size == new_size 
 	return va;
 }
 
