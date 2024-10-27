@@ -72,17 +72,16 @@ void wakeup_one(struct Channel *chan)
         panic("You cannot access the queue");
     }
 	
-    if (!queue_size(&(chan->queue))){
-		panic("No Processes in the queue");
-    }
+    if (queue_size(&(chan->queue))){
 
-    acquire_spinlock(&ProcessQueues.qlock);
+		acquire_spinlock(&ProcessQueues.qlock);
 
-    struct Env *ready = dequeue(&(chan->queue)); 
+		struct Env *ready = dequeue(&(chan->queue)); 
+		
+		sched_insert_ready0(ready);
 
-    sched_insert_ready0(ready);
-
-    release_spinlock(&ProcessQueues.qlock);
+		release_spinlock(&ProcessQueues.qlock);
+	}
 }
 
 //====================================================
