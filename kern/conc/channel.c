@@ -65,10 +65,24 @@ void sleep(struct Channel *chan, struct spinlock *lk)
 // chan MUST be of type "struct Env_Queue" to hold the blocked processes
 void wakeup_one(struct Channel *chan)
 {
-	// TODO: [PROJECT'24.MS1 - #11] [4] LOCKS - wakeup_one
-	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("wakeup_one is not implemented yet");
-	// Your Code is Here...
+	
+    // TODO: [PROJECT'24.MS1 - #11] [4] LOCKS - wakeup_one
+
+    if (ProcessQueues.qlock.locked){
+        panic("You cannot access the queue");
+    }
+	
+    if (!queue_size(&(chan->queue))){
+		panic("No Processes in the queue");
+    }
+
+    acquire_spinlock(&ProcessQueues.qlock);
+
+    struct Env *ready = dequeue(&(chan->queue)); 
+
+    sched_insert_ready0(ready);
+
+    release_spinlock(&ProcessQueues.qlock);
 }
 
 //====================================================
@@ -81,8 +95,13 @@ void wakeup_one(struct Channel *chan)
 
 void wakeup_all(struct Channel *chan)
 {
-	// TODO: [PROJECT'24.MS1 - #12] [4] LOCKS - wakeup_all
-	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("wakeup_all is not implemented yet");
-	// Your Code is Here...
+	//TODO: [PROJECT'24.MS1 - #12] [4] LOCKS - wakeup_all
+	if (ProcessQueues.qlock.locked)
+	{
+		panic("You cannot access the queue");
+	}
+
+	while(queue_size(&(chan->queue))){
+		wakeup_one(chan);
+	}
 }
