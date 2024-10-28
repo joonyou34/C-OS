@@ -179,6 +179,9 @@ void* split_block(void* va, uint32 sze, uint32 rem_sze)
 //=========================================
 void *alloc_block_FF(uint32 size)
 {
+	if(size == 0)
+		return NULL;
+
 	//==================================================================================
 	//DON'T CHANGE THESE LINES==========================================================
 	//==================================================================================
@@ -202,8 +205,7 @@ void *alloc_block_FF(uint32 size)
 	// panic("alloc_block_FF is not implemented yet");
 	//Your Code is Here...
 
-	if(size == 0)
-		return NULL;
+	
 	size += 2*sizeof(int);
 	struct BlockElement* it;
 	LIST_FOREACH(it, &freeBlocksList) {
@@ -365,7 +367,7 @@ void *realloc_block_FF(void* va, uint32 new_size)
 		uint32 rem_size = current_size - new_size;
 
 		if(rem_size >= sizeof(int)*4)
-		{	
+		{
 			split_block(va, new_size, rem_size);
 			set_block_data(va, new_size, 1);
 		}
@@ -375,7 +377,8 @@ void *realloc_block_FF(void* va, uint32 new_size)
 	else if(current_size < new_size) /*ENLARGE*/
 	{
 		char* nxtAddress = (((char*)va + current_size));
-		if(is_free_block(nxtAddress) && current_size + get_block_size(nxtAddress) >= new_size){
+		if(is_free_block(nxtAddress) && current_size + get_block_size(nxtAddress) >= new_size)
+		{
 			LIST_REMOVE(&freeBlocksList, (struct BlockElement*)nxtAddress);
 			set_block_data(va,new_size,1);
 			uint32 total_available_size = current_size + get_block_size(nxtAddress);
@@ -398,7 +401,8 @@ void *realloc_block_FF(void* va, uint32 new_size)
 		else
 		{
 			void* new_block = alloc_block_FF(new_size);
-			if(new_block==NULL){
+			if(new_block==NULL)
+			{
 				return NULL;
 			}
 			memcpy(new_block, va, current_size - sizeof(int)*2);
