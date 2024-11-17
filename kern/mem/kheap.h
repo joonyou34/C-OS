@@ -43,8 +43,8 @@ int numOfKheapVACalls ;
 
 //TODO: [PROJECT'24.MS2 - #01] [1] KERNEL HEAP - add suitable code here
 
-unsigned* start;
-unsigned* brk;
-unsigned* limit;
+uint32* start;
+uint32* brk;
+uint32* limit;
 
 #endif // FOS_KERN_KHEAP_H_

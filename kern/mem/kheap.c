@@ -16,26 +16,31 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	// Write your code here, remove the panic and write your code
 	//panic("initialize_kheap_dynamic_allocator() is not implemented yet...!!");
 
-	start = (unsigned*)daStart;
-	brk = (unsigned*)(start + initSizeToAllocate);
-	limit = (unsigned*)daLimit;
+	start = (uint32*)daStart;
+	brk = (uint32*)(start + initSizeToAllocate);
+	limit = (uint32*)daLimit;
 
 	if(brk > limit){
 		panic("No Space available");
 	}
 
-	unsigned end = ROUNDUP(daStart+initSizeToAllocate,PAGE_SIZE);
+	uint32 finish;
+	finish = ROUNDUP((uint32)brk,PAGE_SIZE);
 
-	for(uint32 i = start; i < end; i += PAGE_SIZE){
+	
+	for(uint32 i = (uint32)start; i < finish; i += PAGE_SIZE){
 		
 		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory,i,NULL);
 		
-		int ret = allocate_frame(ptr_frame_info);
-		if(ret == E_NO_MEM)
+		int ret = allocate_frame(&ptr_frame_info);
+		if(ret == E_NO_MEM){
 			panic("No Memory available");
-		
-		map_frame(ptr_page_directory,ptr_frame_info,i,0);
+		}
 
+		ret = map_frame(ptr_page_directory,ptr_frame_info,i,0);
+
+		// if(ret == E_NO_MEM)
+		// 	panic("No Memory for page table");
 	}
 
 	initialize_dynamic_allocator(daStart, initSizeToAllocate);
@@ -80,10 +85,36 @@ void kfree(void* virtual_address)
 {
 	//TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
 	// Write your code here, remove the panic and write your code
-	panic("kfree() is not implemented yet...!!");
+	//panic("kfree() is not implemented yet...!!");
 
 	//you need to get the size of the given allocation using its address
 	//refer to the project presentation and documentation for details
+
+	if((uint32)virtual_address == KERNEL_HEAP_MAX){
+		panic("No such address");
+	}
+
+	if((uint32)virtual_address < (uint32)limit){
+		free_block(virtual_address);
+	}
+
+	else{
+		uint32 i = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
+
+		//get the virsual_address's table
+		uint32* table;
+		get_frame_info(ptr_page_directory, i, &table);
+
+		while(1){
+			uint32* curr_table;
+			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, i, &curr_table);
+			if(ptr_frame_info == NULL || table != curr_table){
+				break;
+			}
+			free_frame(ptr_frame_info);
+			unmap_frame(ptr_page_directory, i);
+		}
+	}
 
 }
 
