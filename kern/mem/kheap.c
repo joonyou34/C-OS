@@ -24,21 +24,15 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		panic("No Space available");
 	}
 
-<<<<<<< HEAD
+
 	uint32 finish;
 	finish = ROUNDUP((uint32)brk,PAGE_SIZE);
 
 	
 	for(uint32 i = (uint32)start; i < finish; i += PAGE_SIZE){
-=======
-	// unsigned end = ROUNDUP(daStart+initSizeToAllocate,PAGE_SIZE);
-
-	// for(uint32 i = start; i < end; i += PAGE_SIZE){
->>>>>>> ed8f587b193848e9e4c8d13eb33b22683bfda096
 		
-	// 	struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory,i,NULL);
+		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory,i,NULL);
 		
-<<<<<<< HEAD
 		int ret = allocate_frame(&ptr_frame_info);
 		if(ret == E_NO_MEM){
 			panic("No Memory available");
@@ -49,17 +43,8 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		// if(ret == E_NO_MEM)
 		// 	panic("No Memory for page table");
 	}
-=======
-	// 	int ret = allocate_frame(ptr_frame_info);
-	// 	if(ret == E_NO_MEM)
-	// 		panic("No Memory available");
-		
-	// 	map_frame(ptr_page_directory,ptr_frame_info,i,0);
 
-	// }
->>>>>>> ed8f587b193848e9e4c8d13eb33b22683bfda096
-
-	// initialize_dynamic_allocator(daStart, initSizeToAllocate);
+	initialize_dynamic_allocator(daStart, initSizeToAllocate);
 
 	return 0;
 }
