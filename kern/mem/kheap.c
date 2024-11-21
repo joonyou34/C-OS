@@ -30,28 +30,39 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		uint32 *ptr;
 		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr); // GOTCHA BITCH.
 
-		if (ptr_frame_info != NULL)
+		uint32 finish;
+		finish = ROUNDUP((uint32)brk, PAGE_SIZE);
+
+		for (uint32 i = (uint32)start; i < finish; i += PAGE_SIZE)
 		{
-			panic("frame already exist");
+
+			uint32 *ptr;
+			struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr);
+
+			int ret = allocate_frame(&ptr_frame_info);
+			if (ret == E_NO_MEM)
+			{
+				panic("No Memory available");
+			}
+
+			ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE);
+
+			// if (ret == E_NO_MEM)
+			// {
+			// 	panic("No Memory available");
+			// }
+
+			// int perms = pt_get_page_permissions(ptr_page_directory,i);
+			ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
+
+			// if (ret == E_NO_MEM)
+			// 	panic("No Memory for page table");
 		}
 
-		int ret = allocate_frame(&ptr_frame_info);
+		initialize_dynamic_allocator(daStart, initSizeToAllocate);
 
-		// if (ret == E_NO_MEM)
-		// {
-		// 	panic("No Memory available");
-		// }
-
-		// int perms = pt_get_page_permissions(ptr_page_directory,i);
-		ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
-
-		// if (ret == E_NO_MEM)
-		// 	panic("No Memory for page table");
+		return 0;
 	}
-
-	initialize_dynamic_allocator(daStart, initSizeToAllocate);
-
-	return 0;
 }
 
 void *sbrk(int numOfPages)
@@ -67,12 +78,34 @@ void *sbrk(int numOfPages)
 	 */
 
 	// MS2: COMMENT THIS LINE BEFORE START CODING==========
-	return (void *)-1;
+	//  return (void*)-1 ;
 	//====================================================
 
 	// TODO: [PROJECT'24.MS2 - #02] [1] KERNEL HEAP - sbrk
 	//  Write your code here, remove the panic and write your code
-	panic("sbrk() is not implemented yet...!!");
+	//  panic("sbrk() is not implemented yet...!!");
+
+	if (!numOfPages)
+		return brk;
+	uint32 numBytes = numOfPages * PAGE_SIZE;
+	uint32 *finish = (uint32 *)(((char *)brk) + numBytes);
+	if (finish > limit)
+		return (void *)-1;
+
+	for (uint32 va = (uint32)brk; (uint32 *)va < finish; va += PAGE_SIZE)
+	{
+		uint32 *ptr;
+		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, va, &ptr);
+
+		int ret = allocate_frame(&ptr_frame_info);
+		if (ret == E_NO_MEM)
+			return (void *)-1;
+
+		ret = map_frame(ptr_page_directory, ptr_frame_info, va, PERM_WRITEABLE);
+	}
+	uint32 *old = brk;
+	brk = finish;
+	return (void *)old;
 }
 
 // TODO: [PROJECT'24.MS2 - BONUS#2] [1] KERNEL HEAP - Fast Page Allocator
