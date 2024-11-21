@@ -39,7 +39,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		{
 			panic("No Memory available");
 		}
-		
+
 		// int perms = pt_get_page_permissions(ptr_page_directory,i);
 		ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
 
@@ -115,54 +115,45 @@ void *kmalloc(unsigned int size)
 	}
 	else
 	{
-		// cprintf("allocating %d bytes using page allocator\n", size);
 		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-		// cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
-
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
-		// find contiguous pages
 		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
 		{
 			uint32 *ptr_table;
 			struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
-
 			if (frame_info == NULL)
 			{
 				if (pagesFound == 0)
-				{
 					firstPageAddr = addr;
-				}
 				pagesFound++;
 				if (pagesFound == numOfPages)
 					break;
 			}
 			else
-				pagesFound = 0, firstPageAddr = 0;
+			{
+				pagesFound = 0;
+				firstPageAddr = 0;
+			}
 		}
 
-		if (pagesFound < numOfPages) // PROBLEMATIC PART
-		{
-			// expand the heap using sbrk
-			void *new_heap_start = sbrk(size); // sbrk not implemented yet
-			if (new_heap_start == NULL)
-				return NULL;
+		if (pagesFound < numOfPages)
+			return NULL;
 
-			firstPageAddr = (uint32)new_heap_start; 
-			cprintf("Chosen first address: %x\n", firstPageAddr);
-
-		}
-
-		// cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
-
-		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + (numOfPages * PAGE_SIZE)); addr += PAGE_SIZE)
+		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
 		{
 			struct FrameInfo *frame_info = NULL;
 			if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
-				// if any of these two return 0
+			{
+				// Roll back if allocation fails
+				for (uint32 rollback_addr = firstPageAddr; rollback_addr < addr; rollback_addr += PAGE_SIZE)
+				{
+					unmap_frame(ptr_page_directory, rollback_addr);
+				}
 				return NULL;
+			}
 		}
 
 		return (void *)firstPageAddr;
@@ -263,85 +254,87 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 
 void *krealloc(void *virtual_address, uint32 new_size)
 {
-	//TODO LOGIC
-	//if less than 2kb = realloc
-	//else if more kmalloc, kfree
-	//else if 0 = kfree
-	//else if address == null = kmalloc
+	// TODO LOGIC
+	// if less than 2kb = realloc
+	// else if more kmalloc, kfree
+	// else if 0 = kfree
+	// else if address == null = kmalloc
 
-	if(virtual_address == NULL)
-	{
-		if(new_size == 0)
-			return NULL;
-		if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
-			return kmalloc(new_size);
-		else
-			return alloc_block_FF(new_size);
-	}
+	// if(virtual_address == NULL)
+	// {
+	// 	if(new_size == 0)
+	// 		return NULL;
+	// 	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
+	// 		return kmalloc(new_size);
+	// 	else
+	// 		return alloc_block_FF(new_size);
+	// }
 
-	if(new_size == 0)
-	{
-		kfree(virtual_address);
-		return NULL;
-	}
+	// if(new_size == 0)
+	// {
+	// 	kfree(virtual_address);
+	// 	return NULL;
+	// }
 
-	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
-	{
-		//allocate block using kmalloc
-		// if allocated then copy the memory and free the old
-		// else then return null
+	// if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
+	// {
+	// 	//allocate block using kmalloc
+	// 	// if allocated then copy the memory and free the old
+	// 	// else then return null
 
-		void* va = kmalloc(new_size);
+	// 	void* va = kmalloc(new_size);
 
-		if(va == NULL)
-		{
-			return NULL;
-		}
-		else
-		{
-			uint32 numOfPages = 0;
-			uint32* table;
-			get_frame_info(ptr_page_directory, virtual_address, &table);
+	// 	if(va == NULL)
+	// 	{
+	// 		return NULL;
+	// 	}
+	// 	else
+	// 	{
+	// 		uint32 numOfPages = 0;
+	// 		uint32* table;
+	// 		get_frame_info(ptr_page_directory, virtual_address, &table);
 
-			while(1){
-				uint32* curr_table;
-				struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
-				if(ptr_frame_info == NULL || table != curr_table){
-					break;
-				}
-				numOfPages++;
-			}
-			uint32 oldSize = numOfPages * PAGE_SIZE;
-			memcpy(va, virtual_address, oldSize);
-			kfree(virtual_address);
-		}
-	}
-	else /*it was pages and going to block*/
-	{
-		//alocate the block using allocff
-		void* new_block = alloc_block_FF(new_size);
-		if(new_block==NULL)
-		{
-			return NULL;
-		}
-		else
-		{
-			uint32 numOfPages = 0;
-			uint32* table;
-			get_frame_info(ptr_page_directory, virtual_address, &table);
+	// 		while(1){
+	// 			uint32* curr_table;
+	// 			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
+	// 			if(ptr_frame_info == NULL || table != curr_table){
+	// 				break;
+	// 			}
+	// 			numOfPages++;
+	// 		}
+	// 		uint32 oldSize = numOfPages * PAGE_SIZE;
+	// 		memcpy(va, virtual_address, oldSize);
+	// 		kfree(virtual_address);
+	// 	}
+	// }
+	// else /*it was pages and going to block*/
+	// {
+	// 	//alocate the block using allocff
+	// 	void* new_block = alloc_block_FF(new_size);
+	// 	if(new_block==NULL)
+	// 	{
+	// 		return NULL;
+	// 	}
+	// 	else
+	// 	{
+	// 		uint32 numOfPages = 0;
+	// 		uint32* table;
+	// 		get_frame_info(ptr_page_directory, virtual_address, &table);
 
-			while(1){
-				uint32* curr_table;
-				struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
-				if(ptr_frame_info == NULL || table != curr_table){
-					break;
-				}
-				numOfPages++;
-			}
-			uint32 oldSize = numOfPages * PAGE_SIZE;
-			memcpy(new_block, virtual_address, oldSize);
-			free_block(virtual_address);
-			return new_block;
-		}
-	}
+	// 		while(1){
+	// 			uint32* curr_table;
+	// 			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
+	// 			if(ptr_frame_info == NULL || table != curr_table){
+	// 				break;
+	// 			}
+	// 			numOfPages++;
+	// 		}
+	// 		uint32 oldSize = numOfPages * PAGE_SIZE;
+	// 		memcpy(new_block, virtual_address, oldSize);
+	// 		free_block(virtual_address);
+	// 		return new_block;
+	// 	}
+	// }
+	panic("krealloc not implemented yet");
+	return NULL;
 }
