@@ -31,14 +31,15 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	
 	for(uint32 i = (uint32)start; i < finish; i += PAGE_SIZE){
 		
-		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory,i,NULL);
+		uint32* ptr;
+		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory,i,&ptr);
 		
 		int ret = allocate_frame(&ptr_frame_info);
 		if(ret == E_NO_MEM){
 			panic("No Memory available");
 		}
 
-		ret = map_frame(ptr_page_directory,ptr_frame_info,i,0);
+		ret = map_frame(ptr_page_directory,ptr_frame_info,i,PERM_WRITEABLE);
 
 		// if(ret == E_NO_MEM)
 		// 	panic("No Memory for page table");
