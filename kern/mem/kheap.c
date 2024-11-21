@@ -115,11 +115,11 @@ void *kmalloc(unsigned int size)
 	}
 	else
 	{
-		cprintf("allocating %d bytes using page allocator\n", size);
+		// cprintf("allocating %d bytes using page allocator\n", size);
 		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-		cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
+		// cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
 
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
@@ -155,7 +155,7 @@ void *kmalloc(unsigned int size)
 
 		}
 
-		cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
+		// cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
 
 		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + (numOfPages * PAGE_SIZE)); addr += PAGE_SIZE)
 		{
