@@ -17,7 +17,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	// panic("initialize_kheap_dynamic_allocator() is not implemented yet...!!");
 
 	start = (uint32 *)ROUNDDOWN(daStart, PAGE_SIZE);
-	brk = (uint32 *)ROUNDUP((uint32)(start + initSizeToAllocate), PAGE_SIZE);
+	brk = (uint32 *)ROUNDUP((uint32)((char *)start + initSizeToAllocate), PAGE_SIZE);
 	limit = (uint32 *)ROUNDUP(daLimit, PAGE_SIZE);
 
 	if ((uint32)limit > KERNEL_HEAP_MAX || (uint32)start < KERNEL_HEAP_START || (uint32)brk > (uint32)limit)
@@ -115,11 +115,10 @@ void *kmalloc(unsigned int size)
 	//  Write your code here, remove the panic and write your code
 	// kpanic_into_prompt("kmalloc() is not implemented yet...!!");
 
-	if (size == 0 || size > (KERNEL_HEAP_MAX - (KERNEL_HEAP_START + DYN_ALLOC_MAX_SIZE + PAGE_SIZE)))
+	if (size == 0 || size > (KERNEL_HEAP_MAX - ((uint32)limit + PAGE_SIZE)))
 	{
 		return NULL;
 	}
-
 	if (size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 	{
 		void *ptr = alloc_block_FF(size);
@@ -130,7 +129,7 @@ void *kmalloc(unsigned int size)
 	else
 	{
 		cprintf("allocating %d bytes using page allocator\n", size);
-		uint32 pgAllocStartArea = KERNEL_HEAP_START + DYN_ALLOC_MAX_SIZE + PAGE_SIZE;
+		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 		cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
@@ -146,7 +145,9 @@ void *kmalloc(unsigned int size)
 			if (frame_info == NULL)
 			{
 				if (pagesFound == 0)
+				{
 					firstPageAddr = addr;
+				}
 				pagesFound++;
 				if (pagesFound == numOfPages)
 					break;
@@ -155,16 +156,16 @@ void *kmalloc(unsigned int size)
 				pagesFound = 0, firstPageAddr = 0;
 		}
 
-		if (pagesFound < numOfPages) // REVISE, NOT VERY SURE OF THE DESIGN
+		if (pagesFound < numOfPages) // PROBLEMATIC PART
 		{
 			// expand the heap using sbrk
 			void *new_heap_start = sbrk(size); // sbrk not implemented yet
 			if (new_heap_start == NULL)
 				return NULL;
 
-			// pgAllocEndArea = (uint32)new_heap_start + ?; // set end allocation area
+			firstPageAddr = (uint32)new_heap_start; 
+			cprintf("Chosen first address: %x\n", firstPageAddr);
 
-			firstPageAddr = pgAllocEndArea;
 		}
 
 		cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
