@@ -60,9 +60,8 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		}
 
 		initialize_dynamic_allocator(daStart, initSizeToAllocate);
-
-		return 0;
 	}
+	return 0;
 }
 
 void *sbrk(int numOfPages)
@@ -130,11 +129,11 @@ void *kmalloc(unsigned int size)
 	}
 	else
 	{
-		// cprintf("allocating %d bytes using page allocator\n", size);
+		cprintf("allocating %d bytes using page allocator\n", size);
 		uint32 pgAllocStartArea = KERNEL_HEAP_START + DYN_ALLOC_MAX_SIZE + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-		// cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
+		cprintf("searching for %d pages from 0x%x to 0x%x\n", numOfPages, pgAllocStartArea, pgAllocEndArea);
 
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
@@ -159,7 +158,7 @@ void *kmalloc(unsigned int size)
 		if (pagesFound < numOfPages) // REVISE, NOT VERY SURE OF THE DESIGN
 		{
 			// expand the heap using sbrk
-			void *new_heap_start = /*sbrk(size)*/ NULL; // sbrk not implemented yet
+			void *new_heap_start = sbrk(size); // sbrk not implemented yet
 			if (new_heap_start == NULL)
 				return NULL;
 
@@ -168,7 +167,7 @@ void *kmalloc(unsigned int size)
 			firstPageAddr = pgAllocEndArea;
 		}
 
-		// cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
+		cprintf("allocating frames from 0x%x to 0x%x\n", firstPageAddr, firstPageAddr + numOfPages * PAGE_SIZE);
 
 		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + (numOfPages * PAGE_SIZE)); addr += PAGE_SIZE)
 		{
