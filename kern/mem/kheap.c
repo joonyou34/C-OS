@@ -63,12 +63,33 @@ void* sbrk(int numOfPages)
 	 */
 
 	//MS2: COMMENT THIS LINE BEFORE START CODING==========
-	return (void*)-1 ;
+	// return (void*)-1 ;
 	//====================================================
 
 	//TODO: [PROJECT'24.MS2 - #02] [1] KERNEL HEAP - sbrk
 	// Write your code here, remove the panic and write your code
-	panic("sbrk() is not implemented yet...!!");
+	// panic("sbrk() is not implemented yet...!!");
+
+	if(!numOfPages)
+		return brk;
+	uint32 numBytes = numOfPages*PAGE_SIZE;
+	uint32* finish = (uint32*)(((char*)brk)+numBytes);
+	if(finish > limit)
+		return (void*)-1;
+	
+	for(uint32 va = (uint32)brk; (uint32*)va < finish; va+=PAGE_SIZE) {
+		uint32* ptr;
+		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, va, &ptr);
+		
+		int ret = allocate_frame(&ptr_frame_info);
+		if(ret == E_NO_MEM)
+			return (void*)-1;
+
+		ret = map_frame(ptr_page_directory, ptr_frame_info, va, PERM_WRITEABLE);
+	}
+	uint32* old = brk;
+	brk = finish;
+	return (void*)old;
 }
 
 //TODO: [PROJECT'24.MS2 - BONUS#2] [1] KERNEL HEAP - Fast Page Allocator

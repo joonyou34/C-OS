@@ -144,11 +144,6 @@ void set_block_data(void* va, uint32 totalSize, bool isAllocated)
 	*((uint32 *)(address + totalSize - 2*sizeof(int))) = ((totalSize) | isAllocated);
 }
 
-void* sbrkBytes(uint32 sz) {
-	return (void *)-1;
-	// return sbrk(ROUNDUP(sz, PAGE_SIZE)/PAGE_SIZE);
-}
-
 void insert_free_block(void* va)
 {
 	struct BlockElement* it;
@@ -172,6 +167,40 @@ void* split_block(void* va, uint32 sze, uint32 rem_sze)
 	return (void*) new_free_block;
 }
 
+//size includes the metadata
+void* handleSbrk(uint32 size) {
+	uint32 sizeInPages = ROUNDUP(size, PAGE_SIZE);
+	void* new_strt = sbrk(sizeInPages/PAGE_SIZE);
+	if(new_strt == (void*) -1)
+		return NULL;
+	
+	char* startva = (char*)new_strt;
+	uint32* newEnd = (uint32*)(startva + sizeInPages - sizeof(int));
+	*newEnd = 1;
+
+	char* prevMeta = startva-2*sizeof(int);
+	uint32 prev_size = (*((uint32*)prevMeta)) & ((~(0x1)));
+	struct BlockElement* prevBlock = (struct BlockElement*)(startva-prev_size);
+	uint32 rem = sizeInPages - size;
+	if(is_free_block(prevBlock)) {
+		LIST_REMOVE(&freeBlocksList, prevBlock);
+		startva = (char*)prevBlock;
+		rem += prev_size;
+	}
+	
+	struct BlockElement* new_free = (struct BlockElement*)(startva+size);
+	if(rem >= 4*sizeof(int)) {
+		set_block_data(new_free, rem, 0);
+		LIST_INSERT_TAIL(&freeBlocksList, new_free);
+	}
+	else
+		size += rem;
+
+	set_block_data(startva, size, 1);
+
+	
+	return (void*)startva;
+}
 
 
 //=========================================
@@ -227,11 +256,8 @@ void *alloc_block_FF(uint32 size)
 			return it;
 		}
 	}
-	//REVISE AFTER SBRK
-	if(sbrkBytes(size) == (void*) -1)
-		return NULL;
-		
-	return alloc_block_FF(size - 2*sizeof(int));
+
+	return handleSbrk(size);
 }
 //=========================================
 // [4] ALLOCATE BLOCK BY BEST FIT:
@@ -287,10 +313,7 @@ void *alloc_block_BF(uint32 size)
 			return best;
 	}
 
-	//REVISE AFTER SBRK
-	if(sbrkBytes(size) == (void*) -1)
-		return NULL;
-	return alloc_block_FF(size - 2*sizeof(int));
+	return handleSbrk(size);
 }
 
 //===================================================
@@ -345,13 +368,8 @@ void *realloc_block_FF(void* va, uint32 new_size)
 	//panic("realloc_block_FF is not implemented yet");
 	//Your Code is Here...
 
-	if(va == NULL){
-
-		if(new_size == 0)
-			return NULL;
-
+	if(va == NULL)
 		return alloc_block_FF(new_size);
-	}
 
 	if(new_size==0){
 		free_block(va);
@@ -380,7 +398,6 @@ void *realloc_block_FF(void* va, uint32 new_size)
 		if(is_free_block(nxtAddress) && current_size + get_block_size(nxtAddress) >= new_size)
 		{
 			LIST_REMOVE(&freeBlocksList, (struct BlockElement*)nxtAddress);
-			set_block_data(va,new_size,1);
 			uint32 total_available_size = current_size + get_block_size(nxtAddress);
 			uint32 rem_size = total_available_size - new_size;
 
