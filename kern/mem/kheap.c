@@ -247,6 +247,7 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 
 	// EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED ==================
 }
+
 //=================================================================================//
 //============================== BONUS FUNCTION ===================================//
 //=================================================================================//
@@ -262,8 +263,85 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 
 void *krealloc(void *virtual_address, uint32 new_size)
 {
-	// TODO: [PROJECT'24.MS2 - BONUS#1] [1] KERNEL HEAP - krealloc
-	//  Write your code here, remove the panic and write your code
-	return NULL;
-	panic("krealloc() is not implemented yet...!!");
+	//TODO LOGIC
+	//if less than 2kb = realloc
+	//else if more kmalloc, kfree
+	//else if 0 = kfree
+	//else if address == null = kmalloc
+
+	if(virtual_address == NULL)
+	{
+		if(new_size == 0)
+			return NULL;
+		if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
+			return kmalloc(new_size);
+		else
+			return alloc_block_FF(new_size);
+	}
+
+	if(new_size == 0)
+	{
+		kfree(virtual_address);
+		return NULL;
+	}
+
+	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
+	{
+		//allocate block using kmalloc
+		// if allocated then copy the memory and free the old
+		// else then return null
+
+		void* va = kmalloc(new_size);
+
+		if(va == NULL)
+		{
+			return NULL;
+		}
+		else
+		{
+			uint32 numOfPages = 0;
+			uint32* table;
+			get_frame_info(ptr_page_directory, virtual_address, &table);
+
+			while(1){
+				uint32* curr_table;
+				struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
+				if(ptr_frame_info == NULL || table != curr_table){
+					break;
+				}
+				numOfPages++;
+			}
+			uint32 oldSize = numOfPages * PAGE_SIZE;
+			memcpy(va, virtual_address, oldSize);
+			kfree(virtual_address);
+		}
+	}
+	else /*it was pages and going to block*/
+	{
+		//alocate the block using allocff
+		void* new_block = alloc_block_FF(new_size);
+		if(new_block==NULL)
+		{
+			return NULL;
+		}
+		else
+		{
+			uint32 numOfPages = 0;
+			uint32* table;
+			get_frame_info(ptr_page_directory, virtual_address, &table);
+
+			while(1){
+				uint32* curr_table;
+				struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
+				if(ptr_frame_info == NULL || table != curr_table){
+					break;
+				}
+				numOfPages++;
+			}
+			uint32 oldSize = numOfPages * PAGE_SIZE;
+			memcpy(new_block, virtual_address, oldSize);
+			free_block(virtual_address);
+			return new_block;
+		}
+	}
 }
