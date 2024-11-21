@@ -25,42 +25,29 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		panic("Unavailable address");
 	}
 
-	for (uint32 i = ROUNDDOWN((uint32)start, PAGE_SIZE); i < (uint32)brk; i += PAGE_SIZE)
+	uint32 finish;
+	finish = ROUNDUP((uint32)brk, PAGE_SIZE);
+
+	for (uint32 i = (uint32)start; i < finish; i += PAGE_SIZE)
 	{
+
 		uint32 *ptr;
-		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr); // GOTCHA BITCH.
+		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr);
 
-		uint32 finish;
-		finish = ROUNDUP((uint32)brk, PAGE_SIZE);
-
-		for (uint32 i = (uint32)start; i < finish; i += PAGE_SIZE)
+		int ret = allocate_frame(&ptr_frame_info);
+		if (ret == E_NO_MEM)
 		{
-
-			uint32 *ptr;
-			struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr);
-
-			int ret = allocate_frame(&ptr_frame_info);
-			if (ret == E_NO_MEM)
-			{
-				panic("No Memory available");
-			}
-
-			ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE);
-
-			// if (ret == E_NO_MEM)
-			// {
-			// 	panic("No Memory available");
-			// }
-
-			// int perms = pt_get_page_permissions(ptr_page_directory,i);
-			ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
-
-			// if (ret == E_NO_MEM)
-			// 	panic("No Memory for page table");
+			panic("No Memory available");
 		}
+		
+		// int perms = pt_get_page_permissions(ptr_page_directory,i);
+		ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
 
-		initialize_dynamic_allocator(daStart, initSizeToAllocate);
+		if (ret == E_NO_MEM)
+			panic("No Memory for page table");
 	}
+
+	initialize_dynamic_allocator(daStart, initSizeToAllocate);
 	return 0;
 }
 
