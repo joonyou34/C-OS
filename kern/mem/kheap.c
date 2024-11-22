@@ -4,23 +4,6 @@
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
 
-#define MAX_FREE_ENTRIES 100
-
-struct FreePageEntry
-{
-	uint32 startAddr;
-	uint32 freePages;
-};
-
-struct FreePageEntry freeList[MAX_FREE_ENTRIES];
-uint32 freeListCount = 1;
-
-void initialize_free_list()
-{
-	freeList[0].startAddr = (uint32)limit + PAGE_SIZE;
-	freeList[0].freePages = (KERNEL_HEAP_MAX - ((uint32)limit + PAGE_SIZE)) / PAGE_SIZE;
-}
-
 // Initialize the dynamic allocator of kernel heap with the given start address, size & limit
 // All pages in the given range should be allocated
 // Remember: call the initialize_dynamic_allocator(..) to complete the initialization
@@ -65,7 +48,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	}
 
 	initialize_dynamic_allocator(daStart, initSizeToAllocate);
-	initialize_free_list();
 	return 0;
 }
 
@@ -131,120 +113,111 @@ void *kmalloc(unsigned int size)
 			cprintf("address out of bounds for block allocator\n");
 		return ptr;
 	}
-
 	else
 	{
+		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
+		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+		uint32 pagesFound = 0, firstPageAddr = 0;
 
-		for (uint32 i = 0; i < freeListCount; i++)
+		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
 		{
-			if (freeList[i].freePages >= numOfPages)
+			uint32 *ptr_table;
+			struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
+			if (frame_info == NULL)
 			{
-				uint32 firstPageAddr = freeList[i].startAddr;
-
-				for (uint32 j = 0; j < numOfPages; j++)
-				{
-					struct FrameInfo *frame_info = NULL;
-					uint32 addr = firstPageAddr + (j * PAGE_SIZE);
-					if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
-					{
-						// fail
-						for (uint32 rollbackIndex = 0; rollbackIndex < j; rollbackIndex++)
-						{
-							unmap_frame(ptr_page_directory, firstPageAddr + (rollbackIndex * PAGE_SIZE));
-						}
-						return NULL;
-					}
-				}
-
-				if (freeList[i].freePages == numOfPages)
-				{
-					// if fully allocated
-					// remove entry
-				}
-				else
-				{
-					freeList[i].startAddr += numOfPages * PAGE_SIZE;
-					freeList[i].freePages -= numOfPages;
-				}
-
-				cprintf("FIRST FIT STRAT(AT SUCCESS): %d\n", isKHeapPlacementStrategyFIRSTFIT());
-				return (void *)firstPageAddr;
+				if (pagesFound == 0)
+					firstPageAddr = addr;
+				pagesFound++;
+				if (pagesFound == numOfPages)
+					break;
+			}
+			else
+			{
+				pagesFound = 0;
+				firstPageAddr = 0;
 			}
 		}
 
-		cprintf("FIRST FIT STRAT (AT NULL): %d\n", isKHeapPlacementStrategyFIRSTFIT());
-		return NULL; 
+		if (pagesFound < numOfPages)
+			return NULL;
+
+		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
+		{
+			struct FrameInfo *frame_info = NULL;
+			if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
+			{
+				// Roll back if allocation fails
+				for (uint32 rollback_addr = firstPageAddr; rollback_addr < addr; rollback_addr += PAGE_SIZE)
+				{
+					unmap_frame(ptr_page_directory, rollback_addr);
+				}
+				return NULL;
+			}
+			// setting 9th bit as a flag to indicate it is the end of allocation
+			if (addr == (firstPageAddr + (numOfPages - 1) * PAGE_SIZE))
+            {
+                addr |= (1 << 9);
+            }
+		}
+
+		return (void *)firstPageAddr;
 	}
-	// else
-	// {
-	// 	uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
-	// 	uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
-	// 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-	// 	uint32 pagesFound = 0, firstPageAddr = 0;
-
-	// for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
-	// {
-	// 	uint32 *ptr_table;
-	// 	struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
-	// 	if (frame_info == NULL)
-	// 	{
-	// 		if (pagesFound == 0)
-	// 			firstPageAddr = addr;
-	// 		pagesFound++;
-	// 		if (pagesFound == numOfPages)
-	// 			break;
-	// 	}
-	// 	else
-	// 	{
-	// 		pagesFound = 0;
-	// 		firstPageAddr = 0;
-	// 	}
-	// // }
-
-	// if (pagesFound < numOfPages)
-	// 	return NULL;
 }
+
 void kfree(void *virtual_address)
 {
-	// TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
-	//  Write your code here, remove the panic and write your code
-	// panic("kfree() is not implemented yet...!!");
+    // TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
+    //  Write your code here, remove the panic and write your code
+    // panic("kfree() is not implemented yet...!!");
 
-	// you need to get the size of the given allocation using its address
-	// refer to the project presentation and documentation for details
+    // you need to get the size of the given allocation using its address
+    // refer to the project presentation and documentation for details
 
-	if ((uint32)virtual_address == KERNEL_HEAP_MAX)
-	{
-		panic("No such address");
-	}
+    if ((uint32)virtual_address < KERNEL_HEAP_START || (uint32)virtual_address >= KERNEL_HEAP_MAX)
+    {
+        panic("Invalid address to free, outside kernel heap bounds");
+    }
 
-	if ((uint32)virtual_address < (uint32)limit)
-	{
-		free_block(virtual_address);
-	}
+    if ((uint32)virtual_address < (uint32)limit)
+    {
+        free_block(virtual_address);
+    }
+    else
+    {
+        uint32 i = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
 
-	else
-	{
-		uint32 i = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
+        // get the virtual address's page table entry
+        uint32 *table;
+        get_frame_info(ptr_page_directory, i, &table);
 
-		// get the virsual_address's table
-		uint32 *table;
-		get_frame_info(ptr_page_directory, i, &table);
+        while (1)
+        {
+            uint32 *curr_table;
+            struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &curr_table);
+            if (ptr_frame_info == NULL)
+            {
+                break;
+            }
 
-		while (1)
-		{
-			uint32 *curr_table;
-			struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &curr_table);
-			if (ptr_frame_info == NULL || table != curr_table)
-			{
-				break;
-			}
-			free_frame(ptr_frame_info);
-			unmap_frame(ptr_page_directory, i);
-		}
-	}
+            free_frame(ptr_frame_info);
+            unmap_frame(ptr_page_directory, i);
+
+            // Check if the 9th bit is set to stop looping
+            if (i & (1 << 9))
+            {
+                i &= ~(1 << 9);
+                break;
+            }
+
+            i += PAGE_SIZE;
+        }
+    }
+    
+    // Flush the TLB so you can't access pages from the cache
+    tlbflush();
 }
+
 
 unsigned int kheap_physical_address(unsigned int virtual_address)
 {
