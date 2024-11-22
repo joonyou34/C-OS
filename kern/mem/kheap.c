@@ -115,11 +115,13 @@ void *kmalloc(unsigned int size)
 	}
 	else
 	{
+		
 		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
+		//get the first Page Address
 		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
 		{
 			uint32 *ptr_table;
@@ -154,12 +156,14 @@ void *kmalloc(unsigned int size)
 				}
 				return NULL;
 			}
-			// setting 9th bit as a flag to indicate it is the end of allocation
+
+			// setting 9th bit (unused bit) of bufferedVA (to use it in kfree)
 			if (addr == (firstPageAddr + (numOfPages - 1) * PAGE_SIZE))
             {
-                addr |= (1 << 9);
+                frame_info->bufferedVA |= (1 << 9);
             }
 		}
+
 
 		return (void *)firstPageAddr;
 	}
@@ -179,43 +183,38 @@ void kfree(void *virtual_address)
         panic("Invalid address to free, outside kernel heap bounds");
     }
 
-    if ((uint32)virtual_address < (uint32)limit)
-    {
-        free_block(virtual_address);
+    if ((uint32)virtual_address < (uint32)limit){
+
+		if ((uint32)virtual_address < (uint32)brk)
+        	free_block(virtual_address);
+
+		return ;
     }
-    else
-    {
-        uint32 i = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
-
-        // get the virtual address's page table entry
-        uint32 *table;
-        get_frame_info(ptr_page_directory, i, &table);
-
-        while (1)
-        {
-            uint32 *curr_table;
-            struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &curr_table);
-            if (ptr_frame_info == NULL)
-            {
-                break;
-            }
-
-            free_frame(ptr_frame_info);
-            unmap_frame(ptr_page_directory, i);
-
-            // Check if the 9th bit is set to stop looping
-            if (i & (1 << 9))
-            {
-                i &= ~(1 << 9);
-                break;
-            }
-
-            i += PAGE_SIZE;
-        }
-    }
+		
+	for(uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE); ; addr += PAGE_SIZE)
+	{
+	
+		uint32 *table;
+		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
+	
+		if (ptr_frame_info == NULL)
+		{
+			panic("Cannot free an already frred page");
+		}
+	
+		if (ptr_frame_info->bufferedVA & (1 << 9))
+		{
+			ptr_frame_info->bufferedVA &= ~(1 << 9);	// reset the bit
+			
+			free_frame(ptr_frame_info);
+			unmap_frame(ptr_page_directory, addr);
+			break;
+		}
+	
+		free_frame(ptr_frame_info);
+		unmap_frame(ptr_page_directory, addr);
+	}
     
-    // Flush the TLB so you can't access pages from the cache
-    tlbflush();
 }
 
 
