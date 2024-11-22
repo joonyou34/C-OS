@@ -4,6 +4,23 @@
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
 
+#define MAX_FREE_ENTRIES 100
+
+struct FreePageEntry
+{
+	uint32 startAddr;
+	uint32 freePages;
+};
+
+struct FreePageEntry freeList[MAX_FREE_ENTRIES];
+uint32 freeListCount = 1;
+
+void initialize_free_list()
+{
+	freeList[0].startAddr = (uint32)limit + PAGE_SIZE;
+	freeList[0].freePages = (KERNEL_HEAP_MAX - ((uint32)limit + PAGE_SIZE)) / PAGE_SIZE;
+}
+
 // Initialize the dynamic allocator of kernel heap with the given start address, size & limit
 // All pages in the given range should be allocated
 // Remember: call the initialize_dynamic_allocator(..) to complete the initialization
@@ -48,6 +65,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	}
 
 	initialize_dynamic_allocator(daStart, initSizeToAllocate);
+	initialize_free_list();
 	return 0;
 }
 
@@ -113,53 +131,80 @@ void *kmalloc(unsigned int size)
 			cprintf("address out of bounds for block allocator\n");
 		return ptr;
 	}
+
 	else
 	{
-		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
-		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-		uint32 pagesFound = 0, firstPageAddr = 0;
 
-		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
+		for (uint32 i = 0; i < freeListCount; i++)
 		{
-			uint32 *ptr_table;
-			struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
-			if (frame_info == NULL)
+			if (freeList[i].freePages >= numOfPages)
 			{
-				if (pagesFound == 0)
-					firstPageAddr = addr;
-				pagesFound++;
-				if (pagesFound == numOfPages)
-					break;
-			}
-			else
-			{
-				pagesFound = 0;
-				firstPageAddr = 0;
-			}
-		}
+				uint32 firstPageAddr = freeList[i].startAddr;
 
-		if (pagesFound < numOfPages)
-			return NULL;
-
-		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
-		{
-			struct FrameInfo *frame_info = NULL;
-			if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
-			{
-				// Roll back if allocation fails
-				for (uint32 rollback_addr = firstPageAddr; rollback_addr < addr; rollback_addr += PAGE_SIZE)
+				for (uint32 j = 0; j < numOfPages; j++)
 				{
-					unmap_frame(ptr_page_directory, rollback_addr);
+					struct FrameInfo *frame_info = NULL;
+					uint32 addr = firstPageAddr + (j * PAGE_SIZE);
+					if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
+					{
+						// fail
+						for (uint32 rollbackIndex = 0; rollbackIndex < j; rollbackIndex++)
+						{
+							unmap_frame(ptr_page_directory, firstPageAddr + (rollbackIndex * PAGE_SIZE));
+						}
+						return NULL;
+					}
 				}
-				return NULL;
+
+				if (freeList[i].freePages == numOfPages)
+				{
+					// if fully allocated
+					// remove entry
+				}
+				else
+				{
+					freeList[i].startAddr += numOfPages * PAGE_SIZE;
+					freeList[i].freePages -= numOfPages;
+				}
+
+				cprintf("FIRST FIT STRAT(AT SUCCESS): %d\n", isKHeapPlacementStrategyFIRSTFIT());
+				return (void *)firstPageAddr;
 			}
 		}
 
-		return (void *)firstPageAddr;
+		cprintf("FIRST FIT STRAT (AT NULL): %d\n", isKHeapPlacementStrategyFIRSTFIT());
+		return NULL; 
 	}
-}
+	// else
+	// {
+	// 	uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
+	// 	uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
+	// 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+	// 	uint32 pagesFound = 0, firstPageAddr = 0;
 
+	// for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
+	// {
+	// 	uint32 *ptr_table;
+	// 	struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
+	// 	if (frame_info == NULL)
+	// 	{
+	// 		if (pagesFound == 0)
+	// 			firstPageAddr = addr;
+	// 		pagesFound++;
+	// 		if (pagesFound == numOfPages)
+	// 			break;
+	// 	}
+	// 	else
+	// 	{
+	// 		pagesFound = 0;
+	// 		firstPageAddr = 0;
+	// 	}
+	// // }
+
+	// if (pagesFound < numOfPages)
+	// 	return NULL;
+}
 void kfree(void *virtual_address)
 {
 	// TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
