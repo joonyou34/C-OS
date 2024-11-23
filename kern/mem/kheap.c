@@ -45,8 +45,9 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 		if (ret == E_NO_MEM)
 			panic("No Memory for page table");
+		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
+		physToVirt[frameNum] = i;
 	}
-
 	initialize_dynamic_allocator(daStart, initSizeToAllocate);
 	return 0;
 }
@@ -88,6 +89,8 @@ void *sbrk(int numOfPages)
 			return (void *)-1;
 
 		ret = map_frame(ptr_page_directory, ptr_frame_info, va, PERM_WRITEABLE);
+		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
+		physToVirt[frameNum] = va;
 	}
 	uint32 *old = brk;
 	brk = finish;
@@ -115,13 +118,13 @@ void *kmalloc(unsigned int size)
 	}
 	else
 	{
-		
+
 		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
-		//get the first Page Address
+		// get the first Page Address
 		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
 		{
 			uint32 *ptr_table;
@@ -156,14 +159,14 @@ void *kmalloc(unsigned int size)
 				}
 				return NULL;
 			}
-
+			uint32 frameNum = to_physical_address(frame_info) / PAGE_SIZE;
+			physToVirt[frameNum] = addr;
 			// setting 9th bit (unused bit) of bufferedVA (to use it in kfree)
 			if (addr == (firstPageAddr + (numOfPages - 1) * PAGE_SIZE))
-            {
-                frame_info->bufferedVA |= (1 << 9);
-            }
+			{
+				frame_info->bufferedVA |= (1 << 9);
+			}
 		}
-
 
 		return (void *)firstPageAddr;
 	}
@@ -171,52 +174,54 @@ void *kmalloc(unsigned int size)
 
 void kfree(void *virtual_address)
 {
-    // TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
-    //  Write your code here, remove the panic and write your code
-    // panic("kfree() is not implemented yet...!!");
+	// TODO: [PROJECT'24.MS2 - #04] [1] KERNEL HEAP - kfree
+	//  Write your code here, remove the panic and write your code
+	// panic("kfree() is not implemented yet...!!");
 
-    // you need to get the size of the given allocation using its address
-    // refer to the project presentation and documentation for details
+	// you need to get the size of the given allocation using its address
+	// refer to the project presentation and documentation for details
 
-    if ((uint32)virtual_address < KERNEL_HEAP_START || (uint32)virtual_address >= KERNEL_HEAP_MAX)
-    {
-        panic("Invalid address to free, outside kernel heap bounds");
-    }
+	if ((uint32)virtual_address < KERNEL_HEAP_START || (uint32)virtual_address >= KERNEL_HEAP_MAX)
+	{
+		panic("Invalid address to free, outside kernel heap bounds");
+	}
 
-    if ((uint32)virtual_address < (uint32)limit){
+	if ((uint32)virtual_address < (uint32)limit)
+	{
 
 		if ((uint32)virtual_address < (uint32)brk)
-        	free_block(virtual_address);
+			free_block(virtual_address);
 
-		return ;
-    }
-		
-	for(uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE); ; addr += PAGE_SIZE)
+		return;
+	}
+
+	for (uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);; addr += PAGE_SIZE)
 	{
-	
+
 		uint32 *table;
-		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
-	
+		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
+
 		if (ptr_frame_info == NULL)
 		{
 			panic("Cannot free an already freed page");
 		}
-	
+
+		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
+		physToVirt[frameNum] = 0;
+
 		if (ptr_frame_info->bufferedVA & (1 << 9))
 		{
-			ptr_frame_info->bufferedVA &= ~(1 << 9);	// reset the bit
-			
+			ptr_frame_info->bufferedVA &= ~(1 << 9); // reset the bit
+
 			free_frame(ptr_frame_info);
 			unmap_frame(ptr_page_directory, addr);
 			break;
 		}
-	
+
 		free_frame(ptr_frame_info);
 		unmap_frame(ptr_page_directory, addr);
 	}
-    
 }
-
 
 unsigned int kheap_physical_address(unsigned int virtual_address)
 {
@@ -226,10 +231,14 @@ unsigned int kheap_physical_address(unsigned int virtual_address)
 	uint32 offset = PGOFF(virtual_address);
 	uint32 *pgTablePtr = NULL;
 	get_page_table(ptr_page_directory, virtual_address, &pgTablePtr);
+	if (pgTablePtr == NULL)
+		return 0;
 	uint32 pgTableEntry = pgTablePtr[PTX(virtual_address)];
+	if (!(pgTableEntry & PERM_PRESENT))
+		return 0;
 	uint32 frameNum = pgTableEntry >> 12;
-	uint32 physicalAddress = frameNum * PAGE_SIZE + offset;
-	return physicalAddress;
+	uint32 pa = frameNum * PAGE_SIZE + offset;
+	return pa;
 	// get corresponding frame number
 	// return the physical address corresponding to given virtual_address
 	// refer to the project presentation and documentation for details
@@ -242,13 +251,14 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	// TODO: [PROJECT'24.MS2 - #06] [1] KERNEL HEAP - kheap_virtual_address
 	//  Write your code here, remove the panic and write your code
 	// panic("kheap_virtual_address() is not implemented yet...!!");
-	uint32 frameNum = physical_address / PAGE_SIZE;
-	uint32 offset = physical_address % PAGE_SIZE;
-	uint32 *pgTablePtr = NULL;
-	get_page_table(ptr_page_directory, (uint32)KERNEL_HEAP_START, &pgTablePtr);
-	uint32 pgTableEntry = pgTablePtr[PTX((uint32)KERNEL_HEAP_START)];
-	uint32 virtualAddress = (pgTableEntry & 0xFFF00000) + offset;
-	return virtualAddress;
+	uint32 frameNum = physical_address / PAGE_SIZE; // Extract frame number
+	uint32 offset = physical_address % PAGE_SIZE;	// Extract offset within the page
+	uint32 virtualAddressBase = physToVirt[frameNum];
+
+	if (virtualAddressBase == 0)
+		return 0;
+
+	return virtualAddressBase + offset;
 
 	// return the virtual address corresponding to given physical_address
 	// refer to the project presentation and documentation for details
