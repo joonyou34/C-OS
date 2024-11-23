@@ -199,7 +199,7 @@ void kfree(void *virtual_address)
 	
 		if (ptr_frame_info == NULL)
 		{
-			panic("Cannot free an already frred page");
+			panic("Cannot free an already freed page");
 		}
 	
 		if (ptr_frame_info->bufferedVA & (1 << 9))
@@ -277,81 +277,68 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	// else if 0 = kfree
 	// else if address == null = kmalloc
 
-	// if(virtual_address == NULL)
-	// {
-	// 	if(new_size == 0)
-	// 		return NULL;
-	// 	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
-	// 		return kmalloc(new_size);
-	// 	else
-	// 		return alloc_block_FF(new_size);
-	// }
+	if(virtual_address == NULL)
+	{
+		if(new_size == 0)
+			return NULL;
+		if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
+			return kmalloc(new_size);
+		else
+			return alloc_block_FF(new_size);
+	}
 
-	// if(new_size == 0)
-	// {
-	// 	kfree(virtual_address);
-	// 	return NULL;
-	// }
+	if(new_size == 0)
+	{
+		kfree(virtual_address);
+		return NULL;
+	}
+	
+	uint32 cntr = 0;
+	for(uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE); ; addr += PAGE_SIZE)
+	{
+	
+		uint32 *table;
+		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
 
-	// if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
-	// {
-	// 	//allocate block using kmalloc
-	// 	// if allocated then copy the memory and free the old
-	// 	// else then return null
+		// gave a wrong va?
+		if (ptr_frame_info == NULL)
+		{
+			return NULL;
+		}
+	
+		if (ptr_frame_info->bufferedVA & (1 << 9))
+		{
+			break;
+		}
+	
+		cntr++;
+	}
+	uint32 currsize = PAGE_SIZE * cntr;
 
-	// 	void* va = kmalloc(new_size);
+	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
+	{
+		//allocate block using kmalloc
+		// if allocated then copy the memory and free the old
+		// else then return null
 
-	// 	if(va == NULL)
-	// 	{
-	// 		return NULL;
-	// 	}
-	// 	else
-	// 	{
-	// 		uint32 numOfPages = 0;
-	// 		uint32* table;
-	// 		get_frame_info(ptr_page_directory, virtual_address, &table);
+		void* va = kmalloc(new_size);
 
-	// 		while(1){
-	// 			uint32* curr_table;
-	// 			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
-	// 			if(ptr_frame_info == NULL || table != curr_table){
-	// 				break;
-	// 			}
-	// 			numOfPages++;
-	// 		}
-	// 		uint32 oldSize = numOfPages * PAGE_SIZE;
-	// 		memcpy(va, virtual_address, oldSize);
-	// 		kfree(virtual_address);
-	// 	}
-	// }
-	// else /*it was pages and going to block*/
-	// {
-	// 	//alocate the block using allocff
-	// 	void* new_block = alloc_block_FF(new_size);
-	// 	if(new_block==NULL)
-	// 	{
-	// 		return NULL;
-	// 	}
-	// 	else
-	// 	{
-	// 		uint32 numOfPages = 0;
-	// 		uint32* table;
-	// 		get_frame_info(ptr_page_directory, virtual_address, &table);
-
-	// 		while(1){
-	// 			uint32* curr_table;
-	// 			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &curr_table);
-	// 			if(ptr_frame_info == NULL || table != curr_table){
-	// 				break;
-	// 			}
-	// 			numOfPages++;
-	// 		}
-	// 		uint32 oldSize = numOfPages * PAGE_SIZE;
-	// 		memcpy(new_block, virtual_address, oldSize);
-	// 		free_block(virtual_address);
-	// 		return new_block;
-	// 	}
-	// }
-	panic("krealloc not implemented yet");
-	return NULL;
+		if(va != NULL)
+		{
+			memcpy(va, virtual_address, currsize);
+			kfree(virtual_address);
+		}
+		return va;
+	}
+	else /*it was pages and going to block*/
+	{
+		//alocate the block using allocff
+		void* new_block = alloc_block_FF(new_size);
+		if(new_block!=NULL)
+		{
+			memcpy(new_block, virtual_address, currsize);
+			free_block(virtual_address);
+		}
+		return new_block;
+	}
 }
