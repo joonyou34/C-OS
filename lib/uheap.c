@@ -8,50 +8,57 @@
 // [1] CHANGE THE BREAK LIMIT OF THE USER HEAP:
 //=============================================
 /*2023*/
-void* sbrk(int increment)
+void *sbrk(int increment)
 {
-	return (void*) sys_sbrk(increment);
+	return (void *)sys_sbrk(increment);
 }
 
 //=================================
 // [2] ALLOCATE SPACE IN USER HEAP:
 //=================================
-void* malloc(uint32 size)
+void *malloc(uint32 size)
 {
 	//==============================================================
-	//DON'T CHANGE THIS CODE========================================
-	if (size == 0) return NULL ;
+	// DON'T CHANGE THIS CODE========================================
+	if (size == 0)
+		return NULL;
 	//==============================================================
-	//TODO: [PROJECT'24.MS2 - #12] [3] USER HEAP [USER SIDE] - malloc()
+	// TODO: [PROJECT'24.MS2 - #12] [3] USER HEAP [USER SIDE] - malloc()
 	// Write your code here, remove the panic and write your code
 	panic("malloc() is not implemented yet...!!");
 	return NULL;
-	//Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
-	//to check the current strategy
-
+	// Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
+	// to check the current strategy
 }
 
 //=================================
 // [3] FREE SPACE FROM USER HEAP:
 //=================================
-void free(void* virtual_address)
+void free(void *virtual_address)
 {
-	//TODO: [PROJECT'24.MS2 - #14] [3] USER HEAP [USER SIDE] - free()
-	// Write your code here, remove the panic and write your code
-	panic("free() is not implemented yet...!!");
+	// TODO: [PROJECT'24.MS2 - #14] [3] USER HEAP [USER SIDE] - free()
+	//  Write your code here, remove the panic and write your code
+	//  panic("free() is not implemented yet...!!");
+	if ((uint32)virtual_address < USER_HEAP_START || (uint32)virtual_address > USER_HEAP_MAX)
+		panic("INVALID ADDRESS\n");
+	if ((uint32)virtual_address < USER_LIMIT)
+	{
+		free_block(virtual_address);
+		return;
+	}
 }
-
 
 //=================================
 // [4] ALLOCATE SHARED VARIABLE:
 //=================================
-void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
+void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 {
 	//==============================================================
-	//DON'T CHANGE THIS CODE========================================
-	if (size == 0) return NULL ;
+	// DON'T CHANGE THIS CODE========================================
+	if (size == 0)
+		return NULL;
 	//==============================================================
-	//TODO: [PROJECT'24.MS2 - #18] [4] SHARED MEMORY [USER SIDE] - smalloc()
+	// TODO: [PROJECT'24.MS2 - #18] [4] SHARED MEMORY [USER SIDE] - smalloc()
 	// Write your code here, remove the panic and write your code
 	panic("smalloc() is not implemented yet...!!");
 	return NULL;
@@ -60,14 +67,13 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 //========================================
 // [5] SHARE ON ALLOCATED SHARED VARIABLE:
 //========================================
-void* sget(int32 ownerEnvID, char *sharedVarName)
+void *sget(int32 ownerEnvID, char *sharedVarName)
 {
-	//TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
-	// Write your code here, remove the panic and write your code
+	// TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
+	//  Write your code here, remove the panic and write your code
 	panic("sget() is not implemented yet...!!");
 	return NULL;
 }
-
 
 //==================================================================================//
 //============================== BONUS FUNCTIONS ===================================//
@@ -84,13 +90,12 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
 //	calls freeSharedObject(...) in "shared_memory_manager.c", then switch back to the user mode here
 //	the freeSharedObject() function is empty, make sure to implement it.
 
-void sfree(void* virtual_address)
+void sfree(void *virtual_address)
 {
-	//TODO: [PROJECT'24.MS2 - BONUS#4] [4] SHARED MEMORY [USER SIDE] - sfree()
-	// Write your code here, remove the panic and write your code
+	// TODO: [PROJECT'24.MS2 - BONUS#4] [4] SHARED MEMORY [USER SIDE] - sfree()
+	//  Write your code here, remove the panic and write your code
 	panic("sfree() is not implemented yet...!!");
 }
-
 
 //=================================
 // REALLOC USER SPACE:
@@ -113,9 +118,7 @@ void *realloc(void *virtual_address, uint32 new_size)
 	// Write your code here, remove the panic and write your code
 	panic("realloc() is not implemented yet...!!");
 	return NULL;
-
 }
-
 
 //==================================================================================//
 //========================== MODIFICATION FUNCTIONS ================================//
@@ -124,15 +127,12 @@ void *realloc(void *virtual_address, uint32 new_size)
 void expand(uint32 newSize)
 {
 	panic("Not Implemented");
-
 }
 void shrink(uint32 newSize)
 {
 	panic("Not Implemented");
-
 }
-void freeHeap(void* virtual_address)
+void freeHeap(void *virtual_address)
 {
 	panic("Not Implemented");
-
 }
