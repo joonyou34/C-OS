@@ -189,13 +189,14 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 	struct FrameInfo *ptr;
 	uint32 va = (uint32)virtual_address;
 
-	// any one loop this fuckn framestorage
-	// LIST_FOREACH(ptr, &free_frame_list){
-
-
-	// 	map_frame(ptr_page_directory,ptr, va,shareObj->isWritable);
-	// 	ptr->references++;
-	// }
+	struct FrameInfo** framesList = shareObj->framesStorage;
+	int finish = shareObj->size/PAGE_SIZE + (shareObj->size%PAGE_SIZE != 0);
+	for(int i = 0; i < finish; i++) {
+		struct FrameInfo* current_frame = framesList[i];
+		map_frame(ptr_page_directory,ptr, va,shareObj->isWritable);
+		current_frame->references++;
+	}
+	
 	shareObj->references++;
 	return shareObj->ID;
 }
