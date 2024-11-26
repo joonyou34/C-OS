@@ -186,7 +186,6 @@ void fault_handler(struct Trapframe *tf)
 
 			if (perms == -1)
 			{
-				// cprintf("Invalid page table entry for VA: %x\n", fault_va);
 				env_exit();
 			}
 
@@ -195,7 +194,6 @@ void fault_handler(struct Trapframe *tf)
 			{
 				if (!(perms & PERM_PRESENT))
 				{	// Page not present
-					// cprintf("Page not present in user heap: %x\n", fault_va);
 					env_exit();
 				}
 			}
@@ -203,13 +201,10 @@ void fault_handler(struct Trapframe *tf)
 			// faulted_va is pointing to kernel space
 			if (fault_va >= KERNEL_BASE)
 			{
-				// cprintf("Kernel space access violation at: %x\n", fault_va);
 				env_exit();
 			}
-
-			if ((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE))
-			{ // Page not writable
-				// cprintf("Write protection violation at: %x\n", fault_va);
+			if(!(perms & PERM_MARKED) || ((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
+				// Page not writable or MARKED
 				env_exit();
 			}
 		}
