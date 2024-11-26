@@ -161,10 +161,15 @@ void *kmalloc(unsigned int size)
 			}
 			uint32 frameNum = to_physical_address(frame_info) / PAGE_SIZE;
 			physToVirt[frameNum] = addr;
-			// setting 9th bit (unused bit) of bufferedVA (to use it in kfree)
+			
+			// setting 9th bit (unused bit) of address (to use it in kfree)
 			if (addr == (firstPageAddr + (numOfPages - 1) * PAGE_SIZE))
 			{
-				frame_info->bufferedVA |= (1 << 9);
+				uint32* table;
+				get_page_table(ptr_page_directory,addr,&table);
+
+				#define LAST_PAGE 512 	// 9TH bit (set when it is the end page in allocation) 
+				table[PTX(addr)] |= LAST_PAGE;
 			}
 		}
 
@@ -209,9 +214,9 @@ void kfree(void *virtual_address)
 		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
 		physToVirt[frameNum] = 0;
 
-		if (ptr_frame_info->bufferedVA & (1 << 9))
+		if (table[PTX(addr)] & LAST_PAGE)
 		{
-			ptr_frame_info->bufferedVA &= ~(1 << 9); // reset the bit
+			table[PTX(addr)] &= ~LAST_PAGE; // reset the bit
 
 			free_frame(ptr_frame_info);
 			unmap_frame(ptr_page_directory, addr);

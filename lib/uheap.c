@@ -1,5 +1,6 @@
 #include <inc/lib.h>
 
+
 //==================================================================================//
 //============================ REQUIRED FUNCTIONS ==================================//
 //==================================================================================//
@@ -13,22 +14,77 @@ void *sbrk(int increment)
 	return (void *)sys_sbrk(increment);
 }
 
+
+struct freePagesEntry
+{
+	uint32 startAddr;
+	uint32 pagesCount;
+};
+
+#define MAX_FREE_ENTRIES 131072		//(USER_HEAP_MAX - USER_HEAP_START)/PAGE_SIZE
+struct freePagesEntry freeList[MAX_FREE_ENTRIES];
+uint32 freeListSize = -1;
+
+void init_free_list(){
+	freeListSize = 1;
+	freeList[0].startAddr = ROUNDUP((uint32)(myEnv->limit),PAGE_SIZE) + PAGE_SIZE;
+	freeList[0].pagesCount = (USER_HEAP_MAX - freeList[0].startAddr) / PAGE_SIZE;
+}
+
 //=================================
 // [2] ALLOCATE SPACE IN USER HEAP:
 //=================================
-void *malloc(uint32 size)
+void* malloc(uint32 size)
 {
 	//==============================================================
-	// DON'T CHANGE THIS CODE========================================
-	if (size == 0)
-		return NULL;
+	//DON'T CHANGE THIS CODE========================================
+	if (size == 0) return NULL ;
 	//==============================================================
-	// TODO: [PROJECT'24.MS2 - #12] [3] USER HEAP [USER SIDE] - malloc()
+	//TODO: [PROJECT'24.MS2 - #12] [3] USER HEAP [USER SIDE] - malloc()
 	// Write your code here, remove the panic and write your code
-	panic("malloc() is not implemented yet...!!");
+	// panic("malloc() is not implemented yet...!!");
+	
+	//Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
+	//to check the current strategy
+	if(!sys_isUHeapPlacementStrategyFIRSTFIT())
+		return NULL;
+
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE){
+		return alloc_block_FF(size);
+	}
+
+	if(freeListSize == -1){	// first allocation
+		init_free_list();
+	}
+
+
+	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+
+	for (uint32 i = 0; i < freeListSize; i++)
+	{
+		if(freeList[i].pagesCount >= numOfPages){
+			uint32 returAddr = freeList[i].startAddr;
+			sys_allocate_user_mem(freeList[i].startAddr, size);
+
+			if(freeList[i].pagesCount > numOfPages){
+				freeList[i].pagesCount -= numOfPages;
+				freeList[i].startAddr += numOfPages * PAGE_SIZE;
+				
+			}
+			else {
+				// remove the current entry
+				freeListSize--;
+				for(; i < freeListSize; i++){
+					freeList[i] = freeList[i+1];
+				}
+			}
+				
+
+			return (void*)returAddr;
+		}
+	}
+	
 	return NULL;
-	// Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
-	// to check the current strategy
 }
 
 //=================================

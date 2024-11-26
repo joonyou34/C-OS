@@ -130,22 +130,32 @@ void* sys_sbrk(int numOfPages)
 	 * NOTES:
 	 * 	1) As in real OS, allocate pages lazily. While sbrk moves the segment break, pages are not allocated
 	 * 		until the user program actually tries to access data in its heap (i.e. will be allocated via the fault handler).
-	 * 	2) Allocating additional pages for a process’ heap will fail if, for example, the free frames are exhausted
+	 * 	2) Allocating additional pages for a processï¿½ heap will fail if, for example, the free frames are exhausted
 	 * 		or the break exceed the limit of the dynamic allocator. If sys_sbrk fails, the net effect should
 	 * 		be that sys_sbrk returns (void*) -1 and that the segment break and the process heap are unaffected.
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
 
 	//TODO: [PROJECT'24.MS2 - #11] [3] USER HEAP - sys_sbrk
-	/*====================================*/
-	/*Remove this line before start coding*/
-	return (void*)-1 ;
-	/*====================================*/
+
+	if(numOfPages < 0){
+		return (void*)-1;
+	}
+	
 	struct Env* env = get_cpu_proc(); //the current running Environment to adjust its break limit
+	
+	void* prev_brk = env->brk;
 
+	env->brk = (uint32*)((uint32)(env->brk) + PAGE_SIZE * numOfPages);
+	
 
+	// new brk will exceed the hard limit or free frames count < numOfPages
+	if((uint32)(env->brk) > (uint32)(env->limit) || MemFrameLists.free_frame_list.size < numOfPages){
+		return (void*)-1;
+	}
+	
+	return prev_brk;
 }
-
 //=====================================
 // 1) ALLOCATE USER MEMORY:
 //=====================================
@@ -158,8 +168,26 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	/*====================================*/
 
 	//TODO: [PROJECT'24.MS2 - #13] [3] USER HEAP [KERNEL SIDE] - allocate_user_mem()
-	// Write your code here, remove the panic and write your code
-	panic("allocate_user_mem() is not implemented yet...!!");
+	// // Write your code here, remove the panic and write your code
+	// panic("allocate_user_mem() is not implemented yet...!!");
+
+	// cprintf("hellloooo from allocate_user_mem()\n");
+
+	
+	
+	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	while (numOfPages--)
+	{
+		uint32* table;
+		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
+		if(!ret)panic("no table");
+
+		#define USER_ALLOCATED 512  // 9TH bit (unused) set when the user allocated this page
+		table[PTX(virtual_address)] |= USER_ALLOCATED;	//set a unused bit
+		
+		virtual_address += PAGE_SIZE;
+	}
+	
 }
 
 //=====================================
