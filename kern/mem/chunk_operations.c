@@ -176,15 +176,27 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	
 	
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	// cprintf("ittt in allocate_user_mem() ,num of pages: %d\n",numOfPages);
 	while (numOfPages--)
 	{
+		
 		uint32* table;
 		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
-		if(!ret)panic("no table");
+	
+		// cprintf("iteration in allocate_user_mem() after get_page table, numOfPages = %d\n",numOfPages);
 
+		if(ret == TABLE_NOT_EXIST){
+			table = create_page_table(ptr_page_directory,virtual_address);
+		}
+		
+		
 		#define USER_ALLOCATED 512  // 9TH bit (unused) set when the user allocated this page
+		
+		// cprintf("iteration in allocate_user_mem() add of table: %d\n",table[PTX(virtual_address)]);
+
 		table[PTX(virtual_address)] |= USER_ALLOCATED;	//set a unused bit
 		
+		// cprintf("iteration in allocate_user_mem() after setting the bit\n");
 		virtual_address += PAGE_SIZE;
 	}
 	

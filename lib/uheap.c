@@ -94,6 +94,7 @@ void init_free_list(){
 //=================================
 void* malloc(uint32 size)
 {
+	cprintf("ittt in malloc()\n");
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	if (size == 0) return NULL ;
@@ -113,11 +114,12 @@ void* malloc(uint32 size)
 
 	if(freeListSize == -1){	// first allocation
 		init_free_list();
+		// cprintf("freelistnum of pages int init= %d\n",freeList[0].pagesCount);
 	}
 
 
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
-
+	// cprintf("ittt in malloc(), number of pages: %d\n",numOfPages);
 	for (uint32 i = 0; i < freeListSize; i++)
 	{
 		if(freeList[i].pagesCount >= numOfPages){
@@ -137,8 +139,12 @@ void* malloc(uint32 size)
 				}
 			}
 				
-
+			// cprintf("freelistsize = %d\n",freeListSize);
+			// cprintf("freelistnum of addr = %d\n",returAddr);
+			cprintf("return done\n");
 			return (void*)returAddr;
+			cprintf("return not done\n");
+
 		}
 	}
 	
