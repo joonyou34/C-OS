@@ -203,7 +203,12 @@ void fault_handler(struct Trapframe *tf)
 			{
 				env_exit();
 			}
-			if(!(perms & PERM_MARKED) || ((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
+			
+			// if(!(perms & PERM_MARKED) ||){
+			// 	env_exit();
+			// }
+
+			if(((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
 				// Page not writable or MARKED
 				env_exit();
 			}
@@ -282,33 +287,33 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 		// allocate space faulted page
 		struct FrameInfo *frame = NULL;
 		int alloc_result = allocate_frame(&frame);
-		if (alloc_result != 0)
+		if (alloc_result != 0 || frame==NULL)
 		{
-			panic("Failed to allocate frame for the faulted page!");
+			panic("Failed to allocate");
 		}
-
+		
 		map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER);
 
 		// Read the page
-		int read_result = pf_read_env_page(faulted_env, (void *)fault_va);
-		if (read_result == E_PAGE_NOT_EXIST_IN_PF)
+		int readpagy = pf_read_env_page(faulted_env, (void *)fault_va);
+		if (readpagy == E_PAGE_NOT_EXIST_IN_PF)
 		{
-			// Check if fault_va is outside valid heap and stack ranges
-			bool invalid_heap = (fault_va < USER_HEAP_START || fault_va > USER_HEAP_MAX);
-			bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va > USTACKTOP);
-
-			if (invalid_heap && invalid_stack)
+			//Check if fault_va is outside valid heap and stack ranges
+			bool invalid_heap = (fault_va < USER_HEAP_START || fault_va >= USER_HEAP_MAX);
+			bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va >= USTACKTOP);
+			if ((invalid_heap && invalid_stack))
 			{
 				env_exit();
 			}
 		}
 		// Update the working set
-		LIST_INSERT_TAIL(&faulted_env->page_WS_list, env_page_ws_list_create_element(faulted_env, fault_va));
-		if (LIST_SIZE((&faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)
+		struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
+		LIST_INSERT_TAIL(&(faulted_env->page_WS_list),NEW_ELEMENTY);
+		if (LIST_SIZE((&faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)//if Working set = max size make it circular linked list
 		{
-			faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+			faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
 		}
-		else
+		else//if not then insert tail and tail points to null
 		{
 			faulted_env->page_last_WS_element = NULL;
 		}
