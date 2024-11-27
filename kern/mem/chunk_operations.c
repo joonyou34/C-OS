@@ -150,7 +150,7 @@ void* sys_sbrk(int numOfPages)
 	
 
 	// new brk will exceed the hard limit or free frames count < numOfPages
-	if((uint32)(env->brk) > (uint32)(env->limit) || MemFrameLists.free_frame_list.size < numOfPages){
+	if((uint32)(env->brk) > (uint32)(env->limit) || (uint32)(env->limit) > USER_HEAP_MAX || (uint32)(env->start) < USER_HEAP_START || MemFrameLists.free_frame_list.size < numOfPages){
 		return (void*)-1;
 	}
 	
@@ -228,7 +228,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 			return;
 		}
 		
-		table[PTX(virtual_address)] &= ~USER_ALLOCATED;		//reset bit
+		table[PTX(virtual_address)] &= ~USER_ALLOCATED;		// unmark bit
 		
 		pf_remove_env_page(e,virtual_address);
 		env_page_ws_invalidate(e,virtual_address);
