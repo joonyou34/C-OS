@@ -150,7 +150,7 @@ void* sys_sbrk(int numOfPages)
 	
 
 	// new brk will exceed the hard limit or free frames count < numOfPages
-	if((uint32)(env->brk) > (uint32)(env->limit) || MemFrameLists.free_frame_list.size < numOfPages){
+	if((uint32)(env->brk) > (uint32)(env->limit) || (uint32)(env->limit) > USER_HEAP_MAX || (uint32)(env->start) < USER_HEAP_START || MemFrameLists.free_frame_list.size < numOfPages){
 		return (void*)-1;
 	}
 	
@@ -176,15 +176,27 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	
 	
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	// cprintf("ittt in allocate_user_mem() ,num of pages: %d\n",numOfPages);
 	while (numOfPages--)
 	{
+		
 		uint32* table;
 		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
-		if(!ret)panic("no table");
+	
+		// cprintf("iteration in allocate_user_mem() after get_page table, numOfPages = %d\n",numOfPages);
 
+		if(ret == TABLE_NOT_EXIST){
+			table = create_page_table(ptr_page_directory,virtual_address);
+		}
+		
+		
 		#define USER_ALLOCATED 512  // 9TH bit (unused) set when the user allocated this page
+
+		// cprintf("iteration in allocate_user_mem() add of table: %d\n",table[PTX(virtual_address)]);
+
 		table[PTX(virtual_address)] |= USER_ALLOCATED;	//set a unused bit
 		
+		// cprintf("iteration in allocate_user_mem() after setting the bit\n");
 		virtual_address += PAGE_SIZE;
 	}
 	
@@ -203,7 +215,26 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 	//TODO: [PROJECT'24.MS2 - #15] [3] USER HEAP [KERNEL SIDE] - free_user_mem
 	// Write your code here, remove the panic and write your code
-	panic("free_user_mem() is not implemented yet...!!");
+	// panic("free_user_mem() is not implemented yet...!!");
+
+	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	while (numOfPages--)
+	{
+		
+		uint32* table;
+		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
+	
+		if(ret == TABLE_NOT_EXIST){
+			return;
+		}
+		
+		table[PTX(virtual_address)] &= ~USER_ALLOCATED;		// unmark bit
+		
+		pf_remove_env_page(e,virtual_address);
+		env_page_ws_invalidate(e,virtual_address);
+		
+		virtual_address += PAGE_SIZE;
+	}
 
 
 	//TODO: [PROJECT'24.MS2 - BONUS#3] [3] USER HEAP [KERNEL SIDE] - O(1) free_user_mem

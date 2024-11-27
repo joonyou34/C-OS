@@ -68,7 +68,7 @@
 #define PTE_MBZ		0x180	// Bits must be zero
 #define PERM_BUFFERED 0x200 //Page it buffered
 
-#define PERM_MARKED 0x400 //Page marked by user
+#define PERM_MARKED 0x200 //Page marked by user
 
 
 // The PERM_AVAILABLE bits aren't used by the kernel or interpreted by the

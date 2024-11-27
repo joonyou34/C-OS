@@ -73,27 +73,33 @@ void *sbrk(int increment)
 }
 
 
-struct freePagesEntry
+struct Page_Block_Entry
 {
 	uint32 startAddr;
-	uint32 pagesCount;
+	uint32 size;
 };
 
 #define MAX_FREE_ENTRIES 131072		//(USER_HEAP_MAX - USER_HEAP_START)/PAGE_SIZE
-struct freePagesEntry freeList[MAX_FREE_ENTRIES];
+struct Page_Block_Entry freeList[MAX_FREE_ENTRIES];
 uint32 freeListSize = -1;
 
 void init_free_list(){
 	freeListSize = 1;
 	freeList[0].startAddr = ROUNDUP((uint32)(myEnv->limit),PAGE_SIZE) + PAGE_SIZE;
-	freeList[0].pagesCount = (USER_HEAP_MAX - freeList[0].startAddr) / PAGE_SIZE;
+	freeList[0].size = USER_HEAP_MAX - freeList[0].startAddr;
 }
+
+
+
+struct Page_Block_Entry allocatedList[MAX_FREE_ENTRIES];
+uint32 allocatedListSize = 0;
 
 //=================================
 // [2] ALLOCATE SPACE IN USER HEAP:
 //=================================
 void* malloc(uint32 size)
 {
+	cprintf("ittt in malloc()\n");
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	if (size == 0) return NULL ;
@@ -113,20 +119,25 @@ void* malloc(uint32 size)
 
 	if(freeListSize == -1){	// first allocation
 		init_free_list();
+		// cprintf("freelistnum of pages int init= %d\n",freeList[0].pagesCount);
 	}
 
 
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
-
+	// cprintf("ittt in malloc(), number of pages: %d\n",numOfPages);
 	for (uint32 i = 0; i < freeListSize; i++)
 	{
-		if(freeList[i].pagesCount >= numOfPages){
+		if(freeList[i].size >= size){
 			uint32 returAddr = freeList[i].startAddr;
 			sys_allocate_user_mem(freeList[i].startAddr, size);
 
-			if(freeList[i].pagesCount > numOfPages){
-				freeList[i].pagesCount -= numOfPages;
-				freeList[i].startAddr += numOfPages * PAGE_SIZE;
+			allocatedList[allocatedListSize].size = size;
+			allocatedList[allocatedListSize].startAddr = freeList[i].startAddr;
+
+			size = ROUNDUP(size,PAGE_SIZE);
+			if(freeList[i].size > size){
+				freeList[i].size -= size;
+				freeList[i].startAddr += size;
 				
 			}
 			else {
@@ -137,8 +148,12 @@ void* malloc(uint32 size)
 				}
 			}
 				
-
+			// cprintf("freelistsize = %d\n",freeListSize);
+			// cprintf("freelistnum of addr = %d\n",returAddr);
+			cprintf("return done\n");
 			return (void*)returAddr;
+			cprintf("return not done\n");
+
 		}
 	}
 	
@@ -153,13 +168,27 @@ void free(void *virtual_address)
 	// TODO: [PROJECT'24.MS2 - #14] [3] USER HEAP [USER SIDE] - free()
 	//  Write your code here, remove the panic and write your code
 	//  panic("free() is not implemented yet...!!");
-	if ((uint32)virtual_address < USER_HEAP_START || (uint32)virtual_address > USER_HEAP_MAX)
+	if ((uint32)virtual_address < USER_HEAP_START || (uint32)virtual_address >= USER_HEAP_MAX)
 		panic("INVALID ADDRESS\n");
-	if ((uint32)virtual_address < USER_LIMIT)
+	if ((uint32)virtual_address < (uint32)(myEnv->limit))
 	{
 		free_block(virtual_address);
 		return;
 	}
+
+	for (uint32 i = 0; i < allocatedListSize; i++)
+	{
+		if(allocatedList[i].startAddr == (uint32)virtual_address){
+			sys_free_user_mem(allocatedList[i].startAddr, allocatedList[i].size);
+			allocatedListSize--;
+
+			// delete the entry
+			for(; i < allocatedListSize; i++)
+				allocatedList[i] = allocatedList[i+1];
+		}
+	}
+
+	panic("INVALID ADDRESS\n");
 }
 
 //=================================

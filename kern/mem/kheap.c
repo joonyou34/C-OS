@@ -294,12 +294,10 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 	if(virtual_address == NULL)
 	{
-		if(new_size == 0)
-			return NULL;
 		if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
 			return kmalloc(new_size);
-		else
-			return alloc_block_FF(new_size);
+
+		return alloc_block_FF(new_size);
 	}
 
 	if(new_size == 0)
@@ -308,29 +306,41 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		return NULL;
 	}
 	
-	uint32 cntr = 0;
-	for(uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE); ; addr += PAGE_SIZE)
-	{
-	
-		uint32 *table;
-		struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
+	uint32 currsize;
+	bool isBlock = 0;
 
-		// gave a wrong va?
-		if (ptr_frame_info == NULL)
-		{
-			return NULL;
-		}
-	
-		if (ptr_frame_info->bufferedVA & (1 << 9))
-		{
-			break;
-		}
-	
-		cntr++;
+	if((uint32)virtual_address <= (uint32)limit){	//it was block
+		currsize = get_block_size(virtual_address);
+		isBlock = 1;
 	}
-	uint32 currsize = PAGE_SIZE * cntr;
 
-	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it was pages and going to pages*/
+	else{	//it was groub of pages
+		uint32 cntr = 0;
+		for(uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE); ; addr += PAGE_SIZE)
+		{
+		
+			uint32 *table;
+			struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
+
+			// gave a wrong va?
+			if (ptr_frame_info == NULL)
+			{
+				return NULL;
+			}
+		
+			if (table[PTX(addr)] & LAST_PAGE)
+			{
+				break;
+			}
+		
+			cntr++;
+		}
+		currsize = PAGE_SIZE * cntr;
+	}
+	
+	uint32 min_size = MIN(currsize,new_size);
+
+	if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it will be groub pages*/
 	{
 		//allocate block using kmalloc
 		// if allocated then copy the memory and free the old
@@ -340,19 +350,25 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 		if(va != NULL)
 		{
-			memcpy(va, virtual_address, currsize);
-			kfree(virtual_address);
+			memcpy(va, virtual_address, min_size);
+			if(isBlock)
+				free_block(virtual_address);
+			else
+				kfree(virtual_address);
 		}
 		return va;
 	}
-	else /*it was pages and going to block*/
+	else /*it will be block*/
 	{
 		//alocate the block using allocff
 		void* new_block = alloc_block_FF(new_size);
 		if(new_block!=NULL)
 		{
-			memcpy(new_block, virtual_address, currsize);
-			free_block(virtual_address);
+			memcpy(new_block, virtual_address, min_size);
+			if(isBlock)
+				free_block(virtual_address);	
+			else
+				kfree(virtual_address);
 		}
 		return new_block;
 	}
