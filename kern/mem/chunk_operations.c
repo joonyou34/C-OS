@@ -149,8 +149,9 @@ void* sys_sbrk(int numOfPages)
 	env->brk = (uint32*)((uint32)(env->brk) + PAGE_SIZE * numOfPages);
 	
 
-	// new brk will exceed the hard limit or free frames count < numOfPages
-	if((uint32)(env->brk) > (uint32)(env->limit) || (uint32)(env->limit) > USER_HEAP_MAX || (uint32)(env->start) < USER_HEAP_START || MemFrameLists.free_frame_list.size < numOfPages){
+	
+	if((uint32)(env->brk) > (uint32)(env->limit) || MemFrameLists.free_frame_list.size < numOfPages){	// new brk will exceed the hard limit or free frames count < numOfPages
+		env->brk = prev_brk;
 		return (void*)-1;
 	}
 	
