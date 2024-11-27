@@ -186,7 +186,7 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 	if(shareObj==NULL){
 		return E_SHARED_MEM_NOT_EXISTS;
 	}
-	struct FrameInfo *ptr;
+	struct FrameInfo *ptr=NULL;
 	uint32 va = (uint32)virtual_address;
 
 	struct FrameInfo** framesList = shareObj->framesStorage;
