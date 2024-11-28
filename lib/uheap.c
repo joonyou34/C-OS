@@ -229,8 +229,29 @@ void *sget(int32 ownerEnvID, char *sharedVarName)
 {
 	// TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
 	//  Write your code here, remove the panic and write your code
-	panic("sget() is not implemented yet...!!");
-	return NULL;
+	//panic("sget() is not implemented yet...!!");
+	//return NULL;
+	int size = sys_getSizeOfSharedObject(ownerEnvID,sharedVarName);
+	if (size == 0)
+		return NULL;
+
+		
+	uint32 pgAllocStartArea = (uint32)myEnv->limit + PAGE_SIZE;
+	uint32 pgAllocEndArea = (uint32)USER_HEAP_MAX;
+	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+
+	uint32 firstPageAddr = find_free_pages_ff(pgAllocStartArea, pgAllocEndArea, numOfPages);
+	
+	if (firstPageAddr == 0)
+		return NULL;
+	else
+	{
+		int shared_ID = sys_getSharedObject(ownerEnvID,sharedVarName, (void*)firstPageAddr);
+
+		
+		return (void *)firstPageAddr;
+	}
+	
 }
 
 //==================================================================================//
