@@ -1,64 +1,5 @@
 #include <inc/lib.h>
 
-
-//Helper Functions
-
-//check if a page is free
-//1 == page is free
-//0 == page is allocated
-int isPageFree(uint32 va)
-{
-    uint32 pdx = PDX(va);
-    uint32 ptx = PTX(va);
-
-    // check if page directory is present (means that something created it)
-    if (!(myEnv->env_page_directory[pdx] & PERM_PRESENT))
-	{
-        return 1;
-    }
-
-    // check if page table is present (means that something created it)
-    uint32 *page_table = (uint32 *)myEnv->env_page_directory[pdx];
-    if (!(page_table[ptx] & PERM_PRESENT))
-	{
-        return 1;
-    }
-
-    return 0;
-}
-
-// apply FF on the Uheap
-// return va if success (uint32)
-// return 0 if fail
-uint32 find_free_pages_ff(uint32 start, uint32 end, uint32 numOfPages)
-{
-    uint32 freePages = 0;
-    uint32 firstPageAddr = 0;
-
-    for (uint32 addr = start; addr < end; addr += PAGE_SIZE)
-	{
-        if (isPageFree(addr))
-		{
-            if (freePages == 0)
-			{
-            	firstPageAddr = addr;
-			}
-            
-			freePages++;
-
-            if (freePages >= numOfPages)
-			{
-                return firstPageAddr;
-			}
-        }
-		else
-		{
-        	freePages = 0;
-		}
-    }
-    return 0;
-}
-
 //==================================================================================//
 //============================ REQUIRED FUNCTIONS ==================================//
 //==================================================================================//
@@ -71,6 +12,7 @@ void *sbrk(int increment)
 {
 	return (void *)sys_sbrk(increment);
 }
+
 
 
 struct Page_Block_Entry
@@ -86,7 +28,7 @@ uint32 freeListSize = -1;
 void init_free_list(){
 	freeListSize = 1;
 	freeList[0].startAddr = ROUNDUP((uint32)(myEnv->limit),PAGE_SIZE) + PAGE_SIZE;
-	freeList[0].size = USER_HEAP_MAX - freeList[0].startAddr;
+	freeList[0].size = ROUNDDOWN(USER_HEAP_MAX - freeList[0].startAddr,PAGE_SIZE);
 }
 
 
@@ -99,7 +41,7 @@ uint32 allocatedListSize = 0;
 //=================================
 void* malloc(uint32 size)
 {
-	cprintf("ittt in malloc()\n");
+	// cprintf("ittt in malloc()\n");
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	if (size == 0) return NULL ;
@@ -119,20 +61,19 @@ void* malloc(uint32 size)
 
 	if(freeListSize == -1){	// first allocation
 		init_free_list();
-		// cprintf("freelistnum of pages int init= %d\n",freeList[0].pagesCount);
 	}
 
 
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
-	// cprintf("ittt in malloc(), number of pages: %d\n",numOfPages);
 	for (uint32 i = 0; i < freeListSize; i++)
 	{
 		if(freeList[i].size >= size){
 			uint32 returAddr = freeList[i].startAddr;
 			sys_allocate_user_mem(freeList[i].startAddr, size);
 
-			allocatedList[allocatedListSize].size = size;
-			allocatedList[allocatedListSize].startAddr = freeList[i].startAddr;
+			allocatedList[allocatedListSize].size = ROUNDUP(size,PAGE_SIZE);
+			allocatedList[allocatedListSize].startAddr = ROUNDDOWN(freeList[i].startAddr,PAGE_SIZE);
+			allocatedListSize++;
 
 			size = ROUNDUP(size,PAGE_SIZE);
 			if(freeList[i].size > size){
@@ -147,12 +88,7 @@ void* malloc(uint32 size)
 					freeList[i] = freeList[i+1];
 				}
 			}
-				
-			// cprintf("freelistsize = %d\n",freeListSize);
-			// cprintf("freelistnum of addr = %d\n",returAddr);
-			cprintf("return done\n");
 			return (void*)returAddr;
-			cprintf("return not done\n");
 
 		}
 	}
@@ -180,12 +116,55 @@ void free(void *virtual_address)
 	{
 		if(allocatedList[i].startAddr == (uint32)virtual_address){
 			sys_free_user_mem(allocatedList[i].startAddr, allocatedList[i].size);
-			allocatedListSize--;
+
+						
+			uint32 j = 0;
+			for(; j < freeListSize; j++){
+				if(freeList[j].startAddr > allocatedList[i].startAddr){
+					break;
+				}
+			}
+			
+			// merge with the back block
+			if(j > 0 && ROUNDUP(freeList[j-1].startAddr + freeList[j-1].size, PAGE_SIZE) == ROUNDDOWN(allocatedList[i].startAddr, PAGE_SIZE)){
+				
+				freeList[j-1].size += allocatedList[i].size;
+				
+				// merge back and next
+				if(ROUNDUP(freeList[j-1].startAddr + freeList[j-1].size,PAGE_SIZE) == ROUNDDOWN(freeList[j].startAddr,PAGE_SIZE)){ 
+					freeListSize--;
+					freeList[j-1].size += freeList[j].size;
+					for(; j<freeListSize; j++){
+						freeList[j] = freeList[j+1];
+					}
+				}
+			}
+
+			// merge with the next block
+			else if(j < freeListSize && ROUNDUP(allocatedList[i].startAddr + allocatedList[i].size,PAGE_SIZE) == ROUNDDOWN(freeList[j].startAddr,PAGE_SIZE)){
+				freeList[j].size += allocatedList[i].size;
+				freeList[j].startAddr = allocatedList[i].startAddr;
+			}
+
+			else
+			{
+				for(uint32 k = freeListSize; k > j; k--){
+					freeList[k] = freeList[k-1];
+				}
+
+				freeListSize++;
+
+				freeList[j] = allocatedList[i];
+			}
 
 			// delete the entry
+			allocatedListSize--;
 			for(; i < allocatedListSize; i++)
 				allocatedList[i] = allocatedList[i+1];
+			
+			return;
 		}
+		
 	}
 
 	panic("INVALID ADDRESS\n");
@@ -203,22 +182,22 @@ void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 	//==============================================================
 	// TODO: [PROJECT'24.MS2 - #18] [4] SHARED MEMORY [USER SIDE] - smalloc()
 	// Write your code here, remove the panic and write your code
-	//panic("smalloc() is not implemented yet...!!");
+	panic("smalloc() is not implemented yet...!!");
 	//return NULL;
 	
-	uint32 pgAllocStartArea = (uint32)myEnv->limit + PAGE_SIZE;
-	uint32 pgAllocEndArea = (uint32)USER_HEAP_MAX;
-	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+	// uint32 pgAllocStartArea = (uint32)myEnv->limit + PAGE_SIZE;
+	// uint32 pgAllocEndArea = (uint32)USER_HEAP_MAX;
+	// uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
-	uint32 firstPageAddr = find_free_pages_ff(pgAllocStartArea, pgAllocEndArea, numOfPages);
+	// uint32 firstPageAddr = find_free_pages_ff(pgAllocStartArea, pgAllocEndArea, numOfPages);
 	
-	if (firstPageAddr == 0)
-		return NULL;
-	else
-	{
-		sys_createSharedObject(sharedVarName,size, isWritable, (void*)firstPageAddr);
-		return (void *)firstPageAddr;
-	}
+	// if (firstPageAddr == 0)
+	// 	return NULL;
+	// else
+	// {
+	// 	sys_createSharedObject(sharedVarName,size, isWritable, (void*)firstPageAddr);
+	// 	return (void *)firstPageAddr;
+	// }
 	
 }
 

@@ -190,9 +190,12 @@ void fault_handler(struct Trapframe *tf)
 			}
 
 			// pointing to an unmarked page in user heap
-			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX && fault_va >= (uint32)(faulted_env->limit) + PAGE_SIZE)
 			{
-				if (!(perms & PERM_PRESENT))
+				#define PERM_USER_MARKED 0x200 //Page marked by user
+				uint32* table;
+				get_page_table(ptr_page_directory,fault_va, &table);
+				if (!(table[PTX(fault_va)] & PERM_USER_MARKED))
 				{	// Page not present
 					env_exit();
 				}
@@ -203,10 +206,7 @@ void fault_handler(struct Trapframe *tf)
 			{
 				env_exit();
 			}
-			
-			// if(!(perms & PERM_MARKED) ||){
-			// 	env_exit();
-			// }
+
 
 			if(((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
 				// Page not writable or MARKED
