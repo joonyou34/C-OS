@@ -182,22 +182,45 @@ void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 	//==============================================================
 	// TODO: [PROJECT'24.MS2 - #18] [4] SHARED MEMORY [USER SIDE] - smalloc()
 	// Write your code here, remove the panic and write your code
-	panic("smalloc() is not implemented yet...!!");
-	//return NULL;
-	
-	// uint32 pgAllocStartArea = (uint32)myEnv->limit + PAGE_SIZE;
-	// uint32 pgAllocEndArea = (uint32)USER_HEAP_MAX;
-	// uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
-	// uint32 firstPageAddr = find_free_pages_ff(pgAllocStartArea, pgAllocEndArea, numOfPages);
+	if(freeListSize == -1)
+	{
+		init_free_list();
+	}
+
+
+	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	for (uint32 i = 0; i < freeListSize; i++)
+	{
+		if(freeList[i].size >= size){
+			uint32 returAddr = freeList[i].startAddr;
+			int32 returnid = sys_createSharedObject(sharedVarName,size, isWritable, (void*)returAddr);
+			if(returnid == E_SHARED_MEM_EXISTS || returnid == E_NO_SHARE)
+			{
+				return NULL;
+			}
+			allocatedList[allocatedListSize].size = ROUNDUP(size,PAGE_SIZE);
+			allocatedList[allocatedListSize].startAddr = ROUNDDOWN(freeList[i].startAddr,PAGE_SIZE);
+			allocatedListSize++;
+
+			size = ROUNDUP(size,PAGE_SIZE);
+			if(freeList[i].size > size){
+				freeList[i].size -= size;
+				freeList[i].startAddr += size;
+				
+			}
+			else {
+				// remove the current entry
+				freeListSize--;
+				for(; i < freeListSize; i++){
+					freeList[i] = freeList[i+1];
+				}
+			}
+			return (void*)returAddr;
+		}
+	}
 	
-	// if (firstPageAddr == 0)
-	// 	return NULL;
-	// else
-	// {
-	// 	sys_createSharedObject(sharedVarName,size, isWritable, (void*)firstPageAddr);
-	// 	return (void *)firstPageAddr;
-	// }
+	return NULL;
 	
 }
 
@@ -208,29 +231,52 @@ void *sget(int32 ownerEnvID, char *sharedVarName)
 {
 	// TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
 	//  Write your code here, remove the panic and write your code
-	//panic("sget() is not implemented yet...!!");
-	//return NULL;
-	int size = sys_getSizeOfSharedObject(ownerEnvID,sharedVarName);
-	if (size == 0)
-		return NULL;
-
-		
-	uint32 pgAllocStartArea = (uint32)myEnv->limit + PAGE_SIZE;
-	uint32 pgAllocEndArea = (uint32)USER_HEAP_MAX;
-	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-
-	uint32 firstPageAddr = find_free_pages_ff(pgAllocStartArea, pgAllocEndArea, numOfPages);
 	
-	if (firstPageAddr == 0)
-		return NULL;
-	else
+	uint32 size = sys_getSizeOfSharedObject(ownerEnvID, sharedVarName);
+	if((void *)size == NULL)
 	{
-		int shared_ID = sys_getSharedObject(ownerEnvID,sharedVarName, (void*)firstPageAddr);
+		return NULL;
+	}
 
-		
-		return (void *)firstPageAddr;
+		if(freeListSize == -1)
+	{
+		init_free_list();
+	}
+
+
+	int32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
+	for (uint32 i = 0; i < freeListSize; i++)
+	{
+		if(freeList[i].size >= size){
+			uint32 returAddr = freeList[i].startAddr;
+			uint32 returnid = sys_getSharedObject(ownerEnvID, sharedVarName, (void*)returAddr);
+			if(returnid == E_SHARED_MEM_NOT_EXISTS)
+			{
+				return NULL;
+			}
+			allocatedList[allocatedListSize].size = ROUNDUP(size,PAGE_SIZE);
+			allocatedList[allocatedListSize].startAddr = ROUNDDOWN(freeList[i].startAddr,PAGE_SIZE);
+			allocatedListSize++;
+
+			size = ROUNDUP(size,PAGE_SIZE);
+			if(freeList[i].size > size){
+				freeList[i].size -= size;
+				freeList[i].startAddr += size;
+				
+			}
+			else {
+				// remove the current entry
+				freeListSize--;
+				for(; i < freeListSize; i++){
+					freeList[i] = freeList[i+1];
+				}
+			}
+			return (void*)returAddr;
+		}
 	}
 	
+	return NULL;
+
 }
 
 //==================================================================================//

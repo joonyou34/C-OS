@@ -61,15 +61,23 @@ int getSizeOfSharedObject(int32 ownerID, char *shareName)
 // [1] Create frames_storage:
 //===========================
 // Create the frames_storage and initialize it by 0
-inline struct FrameInfo **create_frames_storage(int numOfFrames)
+struct FrameInfo **create_frames_storage(int numOfFrames)
 {
 	// TODO: [PROJECT'24.MS2 - #16] [4] SHARED MEMORY - create_frames_storage()
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	//panic("create_frames_storage is not implemented yet");
 	// Your Code is Here...
-
-	struct FrameInfo** FI = (struct FrameInfo **) malloc(number_of_frames);
-	memset(FI,0,sizeof(FI));
+	// TODO: DONT FORGET TO ADD THE INLINE BACK
+	cprintf("meow i entered the create frames storage\n");
+    uint32 frameSize = numOfFrames * sizeof(struct FrameInfo*);
+    struct FrameInfo** FI = (struct FrameInfo **) kmalloc(frameSize);
+	if(FI == NULL)
+	{
+		cprintf("meow i couldnt allocate in create frames storage\n");
+		return NULL;
+	}
+	memset(FI,0, frameSize);
+	cprintf("meow i left the create frames storage\n");
 	return FI;
 }
 
@@ -87,12 +95,31 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	//Your Code is Here...
 	
 	//ID(va), ownerID (have), name(have), size(have), writable(have), framestorage (call create_frame_storage)
-
-	struct Share* Sobject = NULL;
+	cprintf("meow i entered the create share\n");
+	void* va = kmalloc(size);
+	if(va == NULL)
+	{
+		cprintf("meow i couldnt allocate a sobject in the create share\n");
+		return NULL;
+	}
+	struct Share* Sobject = (struct Share *) va;
+	Sobject->ID = (int32)((uint32)va & 0x7FFFFFFF); // mask MSB
+	Sobject->ownerID = ownerID;
 	strcpy(Sobject->name, shareName);
 	Sobject->references = 1;
 	Sobject->size = size;
 	Sobject->isWritable = isWritable;
+
+	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+	struct FrameInfo ** FI = create_frames_storage(numOfPages);
+	if(FI == NULL)
+	{
+		cprintf("meow i couldnt allocate a frame storage in the create share\n");
+		kfree(va);	
+		return NULL;
+	}
+	Sobject->framesStorage = FI;
+	cprintf("meow i left the create share\n");
 	return Sobject;
 }
 
@@ -109,16 +136,17 @@ struct Share *get_share(int32 ownerID, char *name)
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("get_share is not implemented yet");
 	// Your Code is Here...
-
+	acquire_spinlock(&AllShares.shareslock);
 	struct Share *SobjectSearch;
 	LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
 	{
 		if (SobjectSearch->ownerID == ownerID && strcmp(SobjectSearch->name, name) == 0)
 		{
+			release_spinlock(&AllShares.shareslock);
 			return SobjectSearch;
 		}
 	}
-
+	release_spinlock(&AllShares.shareslock);
 	return NULL;
 }
 
@@ -129,28 +157,35 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 {
 	// TODO: [PROJECT'24.MS2 - #19] [4] SHARED MEMORY [KERNEL SIDE] - createSharedObject()
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("createSharedObject is not implemented yet");
+	//panic("createSharedObject is not implemented yet");
 	// Your Code is Here...
 	
 	struct Env* myenv = get_cpu_proc(); //The calling environment
-
+	//shared object already exists
 	if(get_share(ownerID, shareName) != NULL)
 	{
 		return E_SHARED_MEM_EXISTS;
 	}
+
+	#define USER_ALLOCATED 512  // 9TH bit (unused) set when the user allocated this page
+	
 	uint32 va = (uint32)virtual_address;
 	struct Share* Sobject = create_share(ownerID, shareName, size, isWritable);
-	Sobject->ID = (int32)((uint32)virtual_address & 0x7FFFFFFF); // mask MSB
+	if (Sobject == NULL)
+    {
+        return E_NO_SHARE;
+    }
+
+	acquire_spinlock(&AllShares.shareslock);
 	LIST_INSERT_TAIL(&AllShares.shares_list, Sobject);
 
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
-	struct FrameInfo** SobjectFrameArr = create_frames_storage(numOfPages);
 	//index for adding the frames in the frame storage
 	uint32 ind = 0;
 	for (uint32 addr = va; addr < (va + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
 	{
-		struct FrameInfo *frame_info = SobjectFrameArr[ind];
+		struct FrameInfo *frame_info = NULL;
 		if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
 		{
 			// Roll back if allocation fails
@@ -160,12 +195,20 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 			}
 			// Remove the added share
 			LIST_REMOVE(&AllShares.shares_list, AllShares.shares_list.lh_last);
+			memset(Sobject->framesStorage, 0, sizeof(struct FrameInfo*) * numOfPages);
 			//Failed
+			release_spinlock(&AllShares.shareslock);
 			return E_NO_SHARE;
 		}
+
+
+		uint32* table;
+		get_page_table(ptr_page_directory,addr,&table);// 9TH bit (set when it is the end page in allocation) 
+		table[PTX(addr)] |= USER_ALLOCATED;//set a unused bit
+		Sobject->framesStorage[ind] = frame_info;
 		ind++;
 	}
-	Sobject->framesStorage = SobjectFrameArr;
+	release_spinlock(&AllShares.shareslock);
 	return Sobject->ID;
 }
 
@@ -186,15 +229,18 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 	if(shareObj==NULL){
 		return E_SHARED_MEM_NOT_EXISTS;
 	}
-	struct FrameInfo *ptr=NULL;
+
+	struct FrameInfo *ptr;
 	uint32 va = (uint32)virtual_address;
 
 	struct FrameInfo** framesList = shareObj->framesStorage;
 	int finish = shareObj->size/PAGE_SIZE + (shareObj->size%PAGE_SIZE != 0);
-	for(int i = 0; i < finish; i++) {
+	for (int i = 0; i < finish; i++)
+	{
 		struct FrameInfo* current_frame = framesList[i];
-		map_frame(ptr_page_directory,ptr, va,shareObj->isWritable);
+		map_frame(ptr_page_directory, current_frame, va, shareObj->isWritable);
 		current_frame->references++;
+		va += PAGE_SIZE;
 	}
 	
 	shareObj->references++;
