@@ -27,6 +27,7 @@ void init_spinlock(struct spinlock *lk, char *name)
 // other CPUs to waste time spinning to acquire it.
 void acquire_spinlock(struct spinlock *lk)
 {
+
 	if(holding_spinlock(lk))
 		panic("acquire_spinlock: lock \"%s\" is already held by the same CPU.", lk->name);
 

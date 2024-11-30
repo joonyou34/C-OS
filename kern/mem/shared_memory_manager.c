@@ -68,16 +68,13 @@ struct FrameInfo **create_frames_storage(int numOfFrames)
 	//panic("create_frames_storage is not implemented yet");
 	// Your Code is Here...
 	// TODO: DONT FORGET TO ADD THE INLINE BACK
-	cprintf("meow i entered the create frames storage\n");
-    uint32 frameSize = numOfFrames * sizeof(struct FrameInfo*);
+    uint32 frameSize = numOfFrames * sizeof(struct FrameInfo *);
     struct FrameInfo** FI = (struct FrameInfo **) kmalloc(frameSize);
 	if(FI == NULL)
 	{
-		cprintf("meow i couldnt allocate in create frames storage\n");
 		return NULL;
 	}
 	memset(FI,0, frameSize);
-	cprintf("meow i left the create frames storage\n");
 	return FI;
 }
 
@@ -95,11 +92,11 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	//Your Code is Here...
 	
 	//ID(va), ownerID (have), name(have), size(have), writable(have), framestorage (call create_frame_storage)
-	cprintf("meow i entered the create share\n");
-    struct Share *Sobject = (struct Share *)kmalloc(sizeof(struct Share*));
+	cprintf("Creating and Initializing Shared Object...\n");
+	struct Share *Sobject = (struct Share *)kmalloc(sizeof(struct Share));
     if (Sobject == NULL)
     {
-        cprintf("meow, couldn't allocate a Share object in create_share\n");
+        cprintf("couldn't allocate a Share object in create_share!\n");
         return NULL;
     }
 
@@ -114,12 +111,19 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	struct FrameInfo ** FI = create_frames_storage(numOfPages);
 	if(FI == NULL)
 	{
-		cprintf("meow i couldnt allocate a frame storage in the create share\n");
+		cprintf("couldnt allocate a frame storage in the create share!\n");
 		kfree(Sobject);	
 		return NULL;
 	}
 	Sobject->framesStorage = FI;
-	cprintf("meow i left the create share\n");
+	cprintf("Shared Object Created Successfully with values:\nID: %d\nOwnerID: %d\nName: %s\nSize: %u\nIsWritable: %d\nFramesStorage: %p\n", 
+    Sobject->ID, 
+    Sobject->ownerID, 
+    Sobject->name, 
+    Sobject->size, 
+    Sobject->isWritable, 
+    Sobject->framesStorage);
+
 	return Sobject;
 }
 
@@ -140,6 +144,7 @@ struct Share *get_share(int32 ownerID, char *name)
 		acquire_spinlock(&AllShares.shareslock);
 	struct Share *SobjectSearch = NULL;
 	struct Share *res = NULL;
+	cprintf("i am now going to search the list\n");
 	LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
 	{
 		cprintf("Share Name: %s, Owner ID: %d\n", SobjectSearch->name, SobjectSearch->ownerID);
@@ -151,10 +156,19 @@ struct Share *get_share(int32 ownerID, char *name)
 		}
 		cprintf("ok next one\n");
 	}
-	cprintf("please release\n");
+
+	if(res == NULL)
+	{
+		cprintf("I couldnt get the object needed!\n");
+	}
+	else
+	{
+		cprintf("Object retrieved!\n");
+	}
+	
 	if(holding_spinlock(&AllShares.shareslock))
 		release_spinlock(&AllShares.shareslock);
-	cprintf("byebyeee\n");
+	
 	return res;
 }
 
@@ -174,19 +188,15 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 	{
 		return E_SHARED_MEM_EXISTS;
 	}
-	cprintf("i am creating\n");
-	#define USER_ALLOCATED 0x200  // 9TH bit (unused) set when the user allocated this page
 	
 	uint32 va = (uint32)virtual_address;
 	struct Share* Sobject = create_share(ownerID, shareName, size, isWritable);
+	cprintf("Checking if the created Object is null...\n");
 	if (Sobject == NULL)
     {
         return E_NO_SHARE;
     }
-
-	if(!holding_spinlock(&AllShares.shareslock))
-		acquire_spinlock(&AllShares.shareslock);
-	LIST_INSERT_TAIL(&AllShares.shares_list, Sobject);
+	cprintf("Object not NULL!\n");
 
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
@@ -205,15 +215,28 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 				unmap_frame(myenv->env_page_directory, rollback_addr);
 			}
 			// Remove the added share
-			LIST_REMOVE(&AllShares.shares_list, AllShares.shares_list.lh_last);
 			memset(Sobject->framesStorage, 0, sizeof(struct FrameInfo*) * numOfPages);
 			//Failed
 			break;
 		}
+		Sobject->framesStorage[ind] = frame_info;
+		ind++;
 	}
+
+	if(!success)
+	{
+		return E_NO_SHARE;
+	}
+
+	if(!holding_spinlock(&AllShares.shareslock))
+		acquire_spinlock(&AllShares.shareslock);
+
+	LIST_INSERT_TAIL(&AllShares.shares_list, Sobject);
+
 	if(holding_spinlock(&AllShares.shareslock))
 		release_spinlock(&AllShares.shareslock);
-	return success ? Sobject->ID : E_NO_SHARE;
+	
+	return Sobject->ID;
 }
 
 //======================
@@ -222,38 +245,44 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 {
 	// TODO: [PROJECT'24.MS2 - #21] [4] SHARED MEMORY [KERNEL SIDE] - getSharedObject()
-	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	//panic("getSharedObject is not implemented yet");
-	// Your Code is Here...
+	// panic("getSharedObject is not implemented yet");
 
 	struct Env *myenv = get_cpu_proc(); // The calling environment
-	struct Share *shareObj = get_share(ownerID,shareName);
+	struct Share *shareObj = get_share(ownerID, shareName);
 	cprintf("i am getting\n");
-	if(shareObj==NULL){
+
+	if (shareObj == NULL)
+	{
 		return E_SHARED_MEM_NOT_EXISTS;
 	}
 
 	uint32 va = (uint32)virtual_address;
-	struct FrameInfo** framesList = shareObj->framesStorage;
-	int finish = shareObj->size/PAGE_SIZE + (shareObj->size%PAGE_SIZE != 0);
+	struct FrameInfo **framesList = shareObj->framesStorage;
+	int numPages = shareObj->size / PAGE_SIZE + (shareObj->size % PAGE_SIZE != 0);
 
-    for (int i = 0; i < finish; i++)
-    {
-        struct FrameInfo *current_frame = framesList[i];
+	for (int i = 0; i < numPages; i++)
+	{
+		struct FrameInfo *current_frame = framesList[i];
 		uint32 perms = PERM_USER;
-        if(shareObj->isWritable)
-            perms |= PERM_WRITEABLE;
-        map_frame(myenv->env_page_directory, current_frame, va, perms);
-        va += PAGE_SIZE;
-    }
-	
-	//if(!holding_spinlock(&AllShares.shareslock))
+		if (shareObj->isWritable)
+			perms |= PERM_WRITEABLE;
+
+		// Map the frame with error handling to prevent page faults
+		map_frame(myenv->env_page_directory, current_frame, va, perms);
+		va += PAGE_SIZE;
+	}
+
+	if (!holding_spinlock(&AllShares.shareslock))
 		acquire_spinlock(&AllShares.shareslock);
+
 	shareObj->references++;
-	//if(holding_spinlock(&AllShares.shareslock))
+
+	if (holding_spinlock(&AllShares.shareslock))
 		release_spinlock(&AllShares.shareslock);
+
 	return shareObj->ID;
 }
+
 
 //==================================================================================//
 //============================== BONUS FUNCTIONS ===================================//

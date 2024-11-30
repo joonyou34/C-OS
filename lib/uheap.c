@@ -232,9 +232,9 @@ void *sget(int32 ownerEnvID, char *sharedVarName)
 	// TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
 	//  Write your code here, remove the panic and write your code
 	cprintf("I am here mortal...\n");
-	uint32 size = sys_getSizeOfSharedObject(ownerEnvID, sharedVarName);
+	int size = sys_getSizeOfSharedObject(ownerEnvID, sharedVarName);
 	cprintf("size is: %u\n", size);
-	if(size == 0)
+	if(size == 0 || size == E_SHARED_MEM_NOT_EXISTS)
 	{
 		return NULL;
 	}
