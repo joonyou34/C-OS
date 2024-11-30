@@ -42,7 +42,7 @@ int getSizeOfSharedObject(int32 ownerID, char *shareName)
 	// RETURN:
 	//	a) If found, return size of shared object
 	//	b) Else, return E_SHARED_MEM_NOT_EXISTS
-
+	cprintf("haha im here\n");
 	struct Share *ptr_share = get_share(ownerID, shareName);
 	if (ptr_share == NULL)
 		return E_SHARED_MEM_NOT_EXISTS;
@@ -96,14 +96,14 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	
 	//ID(va), ownerID (have), name(have), size(have), writable(have), framestorage (call create_frame_storage)
 	cprintf("meow i entered the create share\n");
-	void* va = kmalloc(size);
-	if(va == NULL)
-	{
-		cprintf("meow i couldnt allocate a sobject in the create share\n");
-		return NULL;
-	}
-	struct Share* Sobject = (struct Share *) va;
-	Sobject->ID = (int32)((uint32)va & 0x7FFFFFFF); // mask MSB
+    struct Share *Sobject = (struct Share *)kmalloc(sizeof(struct Share*));
+    if (Sobject == NULL)
+    {
+        cprintf("meow, couldn't allocate a Share object in create_share\n");
+        return NULL;
+    }
+
+	Sobject->ID = (int32)((uint32)Sobject & 0x7FFFFFFF); // mask MSB
 	Sobject->ownerID = ownerID;
 	strcpy(Sobject->name, shareName);
 	Sobject->references = 1;
@@ -115,7 +115,7 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	if(FI == NULL)
 	{
 		cprintf("meow i couldnt allocate a frame storage in the create share\n");
-		kfree(va);	
+		kfree(Sobject);	
 		return NULL;
 	}
 	Sobject->framesStorage = FI;
@@ -138,18 +138,23 @@ struct Share *get_share(int32 ownerID, char *name)
 	// Your Code is Here...
 	if(!holding_spinlock(&AllShares.shareslock))
 		acquire_spinlock(&AllShares.shareslock);
-	struct Share *SobjectSearch;
+	struct Share *SobjectSearch = NULL;
 	struct Share *res = NULL;
 	LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
 	{
+		cprintf("Share Name: %s, Owner ID: %d\n", SobjectSearch->name, SobjectSearch->ownerID);
 		if (SobjectSearch->ownerID == ownerID && strcmp(SobjectSearch->name, name) == 0)
 		{
+			cprintf("FOUND IT\n");
 			res = SobjectSearch;
 			break;
 		}
+		cprintf("ok next one\n");
 	}
+	cprintf("please release\n");
 	if(holding_spinlock(&AllShares.shareslock))
 		release_spinlock(&AllShares.shareslock);
+	cprintf("byebyeee\n");
 	return res;
 }
 
@@ -191,7 +196,7 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 	for (uint32 addr = va; addr < (va + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
 	{
 		struct FrameInfo *frame_info = NULL;
-		if (allocate_frame(&frame_info) || map_frame(myenv->env_page_directory, frame_info, addr, PERM_WRITEABLE | PERM_USER | PERM_PRESENT))
+		if (allocate_frame(&frame_info) || map_frame(myenv->env_page_directory, frame_info, addr, PERM_WRITEABLE | PERM_USER))
 		{
 			success = 0;
 			// Roll back if allocation fails
@@ -235,7 +240,7 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
     for (int i = 0; i < finish; i++)
     {
         struct FrameInfo *current_frame = framesList[i];
-		uint32 perms = PERM_USER | PERM_PRESENT;
+		uint32 perms = PERM_USER;
         if(shareObj->isWritable)
             perms |= PERM_WRITEABLE;
         map_frame(myenv->env_page_directory, current_frame, va, perms);
