@@ -263,9 +263,7 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 	for (int i = 0; i < numPages; i++)
 	{
 		struct FrameInfo *current_frame = framesList[i];
-		uint32 perms = PERM_USER;
-		if (shareObj->isWritable)
-			perms |= PERM_WRITEABLE;
+		uint32 perms = PERM_USER | (shareObj->isWritable ? PERM_WRITEABLE : 0);
 
 		// Map the frame with error handling to prevent page faults
 		map_frame(myenv->env_page_directory, current_frame, va, perms);
