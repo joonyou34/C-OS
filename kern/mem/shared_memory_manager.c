@@ -277,6 +277,32 @@ void free_share(struct Share *ptrShare)
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	panic("free_share is not implemented yet");
 	// Your Code is Here...
+
+	// if(ptrShare == NULL){
+	// 	panic("it is null ptrShare ni");
+	// }
+	// LIST_REMOVE(&AllShares.shares_list,ptrShare);
+
+	// struct FrameInfo **framesList = ptrShare->framesStorage;
+	// if(framesList!=NULL){
+	// 	int numPages = ptrShare->size / PAGE_SIZE + (ptrShare->size % PAGE_SIZE != 0);
+	// 	for (int i = 0; i < numPages; i++)
+	// 	{
+	// 		struct FrameInfo *current_frame = framesList[i];
+	// 		if(current_frame!=NULL){
+	// 			free_frame(current_frame);
+	// 			kfree((void*)current_frame->bufferedVA);
+	// 			current_frame =NULL;
+	// 		}
+	// 	}
+	// 	kfree(framesList);
+	// 	framesList = NULL;
+	// 	//kfree()
+	// 	//ptrShare->references--;
+	// }
+	// kfree(ptrShare);
+	
+
 	
 }
 //========================
@@ -288,4 +314,52 @@ int freeSharedObject(int32 sharedObjectID, void *startVA)
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	panic("freeSharedObject is not implemented yet");
 	// Your Code is Here...
+
+	// if(!holding_spinlock(&AllShares.shareslock))
+	// 	acquire_spinlock(&AllShares.shareslock);
+	// struct Share *SobjectSearch = NULL;
+	// LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
+	// {
+	// 	if (SobjectSearch->ID == sharedObjectID)
+	// 	{
+	// 		cprintf("FOUND IT\n");
+	// 		break;
+	// 	}
+	// 	cprintf("ok next one\n");
+	// }
+
+	// if(SobjectSearch == NULL){
+		
+	// 	if(holding_spinlock(&AllShares.shareslock))
+	// 		release_spinlock(&AllShares.shareslock);
+	// 	return E_SHARED_MEM_NOT_EXISTS;
+	// }
+	
+	// struct Env *curenv = get_cpu_proc();
+    // uint32 size = ROUNDUP( SobjectSearch->size,PAGE_SIZE);
+    // uint32 start = (uint32)startVA;
+    // uint32 end = start + size;
+
+    // for (uint32 addr = start; addr < end; addr += PAGE_SIZE) {
+    //     unmap_frame(curenv->env_page_directory, addr)  ;
+    // }
+	
+	// curenv->env_page_directory;
+
+
+	// SobjectSearch->references--;
+	// if(SobjectSearch->references==0){
+	// 	free_share(SobjectSearch);
+	// }
+	// else if(SobjectSearch->references<0){
+	// 	panic("what this refrences less 0 nigga");
+	// }
+	// for (uint32 addr = start; addr < end; addr += PAGE_SIZE) {
+    //     tlb_invalidate(curenv->env_page_directory, (void *)addr);
+    // }
+	
+	// if(holding_spinlock(&AllShares.shareslock))
+	// 	release_spinlock(&AllShares.shareslock);
+	// return 1;
+
 }

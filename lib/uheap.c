@@ -13,6 +13,14 @@ void *sbrk(int increment)
 	return (void *)sys_sbrk(increment);
 }
 
+struct FreeShareMapping {
+    uint32 VA;
+    int32 ID;   
+    LIST_ENTRY(FreeShareMapping) prev_next_info; 
+};
+LIST_HEAD(Free_Share_Mapping_List, FreeShareMapping);	
+
+struct Free_Share_Mapping_List shareMappingList;
 
 
 struct Page_Block_Entry
@@ -20,12 +28,15 @@ struct Page_Block_Entry
 	uint32 startAddr;
 	uint32 size;
 };
-
 #define MAX_FREE_ENTRIES 131072		//(USER_HEAP_MAX - USER_HEAP_START)/PAGE_SIZE
 struct Page_Block_Entry freeList[MAX_FREE_ENTRIES];
 uint32 freeListSize = -1;
 
 void init_free_list(){
+	cprintf("init shared list\n");
+	LIST_INIT(&shareMappingList);
+
+	cprintf("done init shared list\n");
 	freeListSize = 1;
 	freeList[0].startAddr = ROUNDUP((uint32)(myEnv->limit),PAGE_SIZE) + PAGE_SIZE;
 	freeList[0].size = ROUNDDOWN(USER_HEAP_MAX - freeList[0].startAddr,PAGE_SIZE);
@@ -216,6 +227,18 @@ void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 					freeList[i] = freeList[i+1];
 				}
 			}
+			cprintf("try to insert in tail\n");
+
+			struct FreeShareMapping fsm  ;
+			//cprintf("return id %x\n",returnid);
+			//cprintf("return add %x\n",returAddr);
+
+			fsm.ID = returnid;
+			fsm.VA = returAddr;
+			struct FreeShareMapping *fsmptr = &fsm;
+			//cprintf("ptr %x",fsmptr);
+			LIST_INSERT_TAIL(&shareMappingList,fsmptr);
+
 			return (void*)returAddr;
 		}
 	}
@@ -300,6 +323,25 @@ void sfree(void *virtual_address)
 	// TODO: [PROJECT'24.MS2 - BONUS#4] [4] SHARED MEMORY [USER SIDE] - sfree()
 	//  Write your code here, remove the panic and write your code
 	panic("sfree() is not implemented yet...!!");
+
+	// if (virtual_address == NULL || ((uint32)virtual_address % PAGE_SIZE) != 0) {
+    //     panic("sfree: Invalid virtual address!");
+    // }
+
+	// uint32 target_va  = (uint32 )virtual_address;
+
+	// struct FreeShareMapping* loopObj = NULL;
+	// LIST_FOREACH(loopObj,&shareMappingList){
+	// 	if (target_va == loopObj->VA){
+	// 		int returnNum = sys_freeSharedObject(loopObj->ID,(void*)loopObj->VA);
+	// 		// write if here to return or delete from free share list
+	// 		if(returnNum==1){
+	// 			LIST_REMOVE(&shareMappingList,loopObj);
+	// 		}
+	// 			break;
+
+	// 	}
+	// } 
 }
 
 //=================================
