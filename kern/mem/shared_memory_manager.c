@@ -42,7 +42,7 @@ int getSizeOfSharedObject(int32 ownerID, char *shareName)
 	// RETURN:
 	//	a) If found, return size of shared object
 	//	b) Else, return E_SHARED_MEM_NOT_EXISTS
-	cprintf("haha im here\n");
+
 	struct Share *ptr_share = get_share(ownerID, shareName);
 	if (ptr_share == NULL)
 		return E_SHARED_MEM_NOT_EXISTS;
@@ -90,13 +90,10 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	//panic("create_share is not implemented yet");
 	//Your Code is Here...
-	
-	//ID(va), ownerID (have), name(have), size(have), writable(have), framestorage (call create_frame_storage)
-	cprintf("Creating and Initializing Shared Object...\n");
+
 	struct Share *Sobject = (struct Share *)kmalloc(sizeof(struct Share));
     if (Sobject == NULL)
     {
-        cprintf("couldn't allocate a Share object in create_share!\n");
         return NULL;
     }
 
@@ -111,19 +108,11 @@ struct Share *create_share(int32 ownerID, char *shareName, uint32 size, uint8 is
 	struct FrameInfo ** FI = create_frames_storage(numOfPages);
 	if(FI == NULL)
 	{
-		cprintf("couldnt allocate a frame storage in the create share!\n");
 		kfree(Sobject);	
 		return NULL;
 	}
-	Sobject->framesStorage = FI;
-	cprintf("Shared Object Created Successfully with values:\nID: %d\nOwnerID: %d\nName: %s\nSize: %u\nIsWritable: %d\nFramesStorage: %p\n", 
-    Sobject->ID, 
-    Sobject->ownerID, 
-    Sobject->name, 
-    Sobject->size, 
-    Sobject->isWritable, 
-    Sobject->framesStorage);
 
+	Sobject->framesStorage = FI;
 	return Sobject;
 }
 
@@ -140,32 +129,23 @@ struct Share *get_share(int32 ownerID, char *name)
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("get_share is not implemented yet");
 	// Your Code is Here...
-	if(!holding_spinlock(&AllShares.shareslock))
-		acquire_spinlock(&AllShares.shareslock);
+
 	struct Share *SobjectSearch = NULL;
 	struct Share *res = NULL;
-	cprintf("i am now going to search the list\n");
+
+	if(!holding_spinlock(&AllShares.shareslock))
+		acquire_spinlock(&AllShares.shareslock);
+
 	LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
 	{
-		cprintf("Share Name: %s, Owner ID: %d\n", SobjectSearch->name, SobjectSearch->ownerID);
 		if (SobjectSearch->ownerID == ownerID && strcmp(SobjectSearch->name, name) == 0)
 		{
-			cprintf("FOUND IT\n");
+
 			res = SobjectSearch;
 			break;
 		}
-		cprintf("ok next one\n");
 	}
 
-	if(res == NULL)
-	{
-		cprintf("I couldnt get the object needed!\n");
-	}
-	else
-	{
-		cprintf("Object retrieved!\n");
-	}
-	
 	if(holding_spinlock(&AllShares.shareslock))
 		release_spinlock(&AllShares.shareslock);
 	
@@ -191,12 +171,12 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 	
 	uint32 va = (uint32)virtual_address;
 	struct Share* Sobject = create_share(ownerID, shareName, size, isWritable);
-	cprintf("Checking if the created Object is null...\n");
+
 	if (Sobject == NULL)
     {
         return E_NO_SHARE;
     }
-	cprintf("Object not NULL!\n");
+
 
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
@@ -249,7 +229,7 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 
 	struct Env *myenv = get_cpu_proc(); // The calling environment
 	struct Share *shareObj = get_share(ownerID, shareName);
-	cprintf("i am getting\n");
+
 
 	if (shareObj == NULL)
 	{

@@ -100,8 +100,8 @@ void fault_handler(struct Trapframe *tf)
 	/******************************************************/
 	// Read processor's CR2 register to find the faulting address
 	uint32 fault_va = rcr2();
-	cprintf("\n************Faulted VA = %x************\n", fault_va);
-	print_trapframe(tf);
+	//cprintf("\n************Faulted VA = %x************\n", fault_va);
+	//print_trapframe(tf);
 	/******************************************************/
 
 	// If same fault va for 3 times, then panic
@@ -156,7 +156,7 @@ void fault_handler(struct Trapframe *tf)
 	// get a pointer to the environment that caused the fault at runtime
 	// cprintf("curenv = %x\n", curenv);
 	struct Env *faulted_env = cur_env;
-	cprintf("yea i faulted so what\n");
+
 	if (faulted_env == NULL)
 	{
 		print_trapframe(tf);
@@ -190,7 +190,6 @@ void fault_handler(struct Trapframe *tf)
 				env_exit();
 			}
 
-			cprintf("im here\n");
 			// pointing to an unmarked page in user heap
 			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX && fault_va >= (uint32)(faulted_env->limit) + PAGE_SIZE)
 			{
@@ -203,7 +202,7 @@ void fault_handler(struct Trapframe *tf)
 					env_exit();
 				}
 			}
-			cprintf("but am i there?\n");
+
 			// faulted_va is pointing to kernel space
 			if (fault_va >= KERNEL_BASE)
 			{
@@ -213,6 +212,11 @@ void fault_handler(struct Trapframe *tf)
 
 			if(((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
 				// Page not writable
+				env_exit();
+			}
+
+			if(!(perms & PERM_USER))
+			{
 				env_exit();
 			}
 		}
