@@ -175,19 +175,18 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	// cprintf("hellloooo from allocate_user_mem()\n");
 
 	
-	
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
 	// cprintf("ittt in allocate_user_mem() ,num of pages: %d\n",numOfPages);
 	while (numOfPages--)
 	{
 		
 		uint32* table;
-		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
+		int ret = get_page_table(e->env_page_directory,virtual_address, &table);
 	
 		// cprintf("iteration in allocate_user_mem() after get_page table, numOfPages = %d\n",numOfPages);
 
 		if(ret == TABLE_NOT_EXIST){
-			table = create_page_table(ptr_page_directory,virtual_address);
+			table = create_page_table(e->env_page_directory,virtual_address);
 		}
 		
 		
@@ -218,12 +217,13 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	// Write your code here, remove the panic and write your code
 	// panic("free_user_mem() is not implemented yet...!!");
 
+
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
 	while (numOfPages--)
 	{
 		
 		uint32* table;
-		int ret = get_page_table(ptr_page_directory,virtual_address, &table);
+		int ret = get_page_table(e->env_page_directory,virtual_address, &table);
 	
 		if(ret == TABLE_NOT_EXIST){
 			return;

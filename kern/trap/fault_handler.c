@@ -156,6 +156,7 @@ void fault_handler(struct Trapframe *tf)
 	// get a pointer to the environment that caused the fault at runtime
 	// cprintf("curenv = %x\n", curenv);
 	struct Env *faulted_env = cur_env;
+	cprintf("yea i faulted so what\n");
 	if (faulted_env == NULL)
 	{
 		print_trapframe(tf);
@@ -189,18 +190,20 @@ void fault_handler(struct Trapframe *tf)
 				env_exit();
 			}
 
+			cprintf("im here\n");
 			// pointing to an unmarked page in user heap
 			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX && fault_va >= (uint32)(faulted_env->limit) + PAGE_SIZE)
 			{
 				#define PERM_USER_MARKED 0x200 //Page marked by user
-				uint32* table;
-				get_page_table(ptr_page_directory,fault_va, &table);
-				if (!(table[PTX(fault_va)] & PERM_USER_MARKED))
+				uint32* table2;
+				get_page_table(faulted_env->env_page_directory,fault_va, &table2);
+				cprintf("%u\n", table2[PTX(fault_va)]);
+				if (!(table2[PTX(fault_va)] & PERM_USER_MARKED) && !(perms & PERM_PRESENT))
 				{	// Page not present
 					env_exit();
 				}
 			}
-
+			cprintf("but am i there?\n");
 			// faulted_va is pointing to kernel space
 			if (fault_va >= KERNEL_BASE)
 			{
@@ -209,7 +212,7 @@ void fault_handler(struct Trapframe *tf)
 
 
 			if(((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
-				// Page not writable or MARKED
+				// Page not writable
 				env_exit();
 			}
 		}

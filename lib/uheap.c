@@ -188,7 +188,7 @@ void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 		init_free_list();
 	}
 
-
+	
 	uint32 numOfPages = ROUNDUP(size,PAGE_SIZE)/PAGE_SIZE;
 	for (uint32 i = 0; i < freeListSize; i++)
 	{
@@ -231,14 +231,15 @@ void *sget(int32 ownerEnvID, char *sharedVarName)
 {
 	// TODO: [PROJECT'24.MS2 - #20] [4] SHARED MEMORY [USER SIDE] - sget()
 	//  Write your code here, remove the panic and write your code
-	
+	cprintf("I am here mortal...\n");
 	uint32 size = sys_getSizeOfSharedObject(ownerEnvID, sharedVarName);
-	if((void *)size == NULL)
+	cprintf("size is: %u\n", size);
+	if(size == 0)
 	{
 		return NULL;
 	}
 
-		if(freeListSize == -1)
+	if(freeListSize == -1)
 	{
 		init_free_list();
 	}

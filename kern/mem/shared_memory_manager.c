@@ -136,18 +136,21 @@ struct Share *get_share(int32 ownerID, char *name)
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("get_share is not implemented yet");
 	// Your Code is Here...
-	acquire_spinlock(&AllShares.shareslock);
+	if(!holding_spinlock(&AllShares.shareslock))
+		acquire_spinlock(&AllShares.shareslock);
 	struct Share *SobjectSearch;
+	struct Share *res = NULL;
 	LIST_FOREACH(SobjectSearch, &AllShares.shares_list)
 	{
 		if (SobjectSearch->ownerID == ownerID && strcmp(SobjectSearch->name, name) == 0)
 		{
-			release_spinlock(&AllShares.shareslock);
-			return SobjectSearch;
+			res = SobjectSearch;
+			break;
 		}
 	}
-	release_spinlock(&AllShares.shareslock);
-	return NULL;
+	if(holding_spinlock(&AllShares.shareslock))
+		release_spinlock(&AllShares.shareslock);
+	return res;
 }
 
 //=========================
@@ -166,8 +169,8 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
 	{
 		return E_SHARED_MEM_EXISTS;
 	}
-
-	#define USER_ALLOCATED 512  // 9TH bit (unused) set when the user allocated this page
+	cprintf("i am creating\n");
+	#define USER_ALLOCATED 0x200  // 9TH bit (unused) set when the user allocated this page
 	
 	uint32 va = (uint32)virtual_address;
 	struct Share* Sobject = create_share(ownerID, shareName, size, isWritable);
@@ -176,40 +179,36 @@ int createSharedObject(int32 ownerID, char *shareName, uint32 size, uint8 isWrit
         return E_NO_SHARE;
     }
 
-	acquire_spinlock(&AllShares.shareslock);
+	if(!holding_spinlock(&AllShares.shareslock))
+		acquire_spinlock(&AllShares.shareslock);
 	LIST_INSERT_TAIL(&AllShares.shares_list, Sobject);
 
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
 	//index for adding the frames in the frame storage
 	uint32 ind = 0;
+	uint8 success = 1;
 	for (uint32 addr = va; addr < (va + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
 	{
 		struct FrameInfo *frame_info = NULL;
-		if (allocate_frame(&frame_info) || map_frame(ptr_page_directory, frame_info, addr, PERM_WRITEABLE))
+		if (allocate_frame(&frame_info) || map_frame(myenv->env_page_directory, frame_info, addr, PERM_WRITEABLE | PERM_USER | PERM_PRESENT))
 		{
+			success = 0;
 			// Roll back if allocation fails
 			for (uint32 rollback_addr = va; rollback_addr < addr; rollback_addr += PAGE_SIZE)
 			{
-				unmap_frame(ptr_page_directory, rollback_addr);
+				unmap_frame(myenv->env_page_directory, rollback_addr);
 			}
 			// Remove the added share
 			LIST_REMOVE(&AllShares.shares_list, AllShares.shares_list.lh_last);
 			memset(Sobject->framesStorage, 0, sizeof(struct FrameInfo*) * numOfPages);
 			//Failed
-			release_spinlock(&AllShares.shareslock);
-			return E_NO_SHARE;
+			break;
 		}
-
-
-		uint32* table;
-		get_page_table(ptr_page_directory,addr,&table);// 9TH bit (set when it is the end page in allocation) 
-		table[PTX(addr)] |= USER_ALLOCATED;//set a unused bit
-		Sobject->framesStorage[ind] = frame_info;
-		ind++;
 	}
-	release_spinlock(&AllShares.shareslock);
-	return Sobject->ID;
+	if(holding_spinlock(&AllShares.shareslock))
+		release_spinlock(&AllShares.shareslock);
+	return success ? Sobject->ID : E_NO_SHARE;
 }
 
 //======================
@@ -223,27 +222,31 @@ int getSharedObject(int32 ownerID, char *shareName, void *virtual_address)
 	// Your Code is Here...
 
 	struct Env *myenv = get_cpu_proc(); // The calling environment
-	
 	struct Share *shareObj = get_share(ownerID,shareName);
-
+	cprintf("i am getting\n");
 	if(shareObj==NULL){
 		return E_SHARED_MEM_NOT_EXISTS;
 	}
 
-	struct FrameInfo *ptr;
 	uint32 va = (uint32)virtual_address;
-
 	struct FrameInfo** framesList = shareObj->framesStorage;
 	int finish = shareObj->size/PAGE_SIZE + (shareObj->size%PAGE_SIZE != 0);
-	for (int i = 0; i < finish; i++)
-	{
-		struct FrameInfo* current_frame = framesList[i];
-		map_frame(ptr_page_directory, current_frame, va, shareObj->isWritable);
-		current_frame->references++;
-		va += PAGE_SIZE;
-	}
+
+    for (int i = 0; i < finish; i++)
+    {
+        struct FrameInfo *current_frame = framesList[i];
+		uint32 perms = PERM_USER | PERM_PRESENT;
+        if(shareObj->isWritable)
+            perms |= PERM_WRITEABLE;
+        map_frame(myenv->env_page_directory, current_frame, va, perms);
+        va += PAGE_SIZE;
+    }
 	
+	//if(!holding_spinlock(&AllShares.shareslock))
+		acquire_spinlock(&AllShares.shareslock);
 	shareObj->references++;
+	//if(holding_spinlock(&AllShares.shareslock))
+		release_spinlock(&AllShares.shareslock);
 	return shareObj->ID;
 }
 
