@@ -69,6 +69,5 @@ int numOfKheapVACalls;
 uint32 *start;
 uint32 *brk;
 uint32 *limit;
-uint32 physToVirt[0xFFFFF000 / 4096];
 
 #endif // FOS_KERN_KHEAP_H_
