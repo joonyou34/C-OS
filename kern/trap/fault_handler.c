@@ -100,8 +100,8 @@ void fault_handler(struct Trapframe *tf)
 	/******************************************************/
 	// Read processor's CR2 register to find the faulting address
 	uint32 fault_va = rcr2();
-	//cprintf("\n************Faulted VA = %x************\n", fault_va);
-	//print_trapframe(tf);
+	//	cprintf("\n************Faulted VA = %x************\n", fault_va);
+	//	print_trapframe(tf);
 	/******************************************************/
 
 	// If same fault va for 3 times, then panic
@@ -156,7 +156,6 @@ void fault_handler(struct Trapframe *tf)
 	// get a pointer to the environment that caused the fault at runtime
 	// cprintf("curenv = %x\n", curenv);
 	struct Env *faulted_env = cur_env;
-
 	if (faulted_env == NULL)
 	{
 		print_trapframe(tf);
@@ -194,10 +193,9 @@ void fault_handler(struct Trapframe *tf)
 			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX && fault_va >= (uint32)(faulted_env->limit) + PAGE_SIZE)
 			{
 				#define PERM_USER_MARKED 0x200 //Page marked by user
-				uint32* table2;
-				get_page_table(faulted_env->env_page_directory,fault_va, &table2);
-				cprintf("%u\n", table2[PTX(fault_va)]);
-				if (!(table2[PTX(fault_va)] & PERM_USER_MARKED) && !(perms & PERM_PRESENT))
+				uint32* table;
+				get_page_table(faulted_env->env_page_directory,fault_va, &table);
+				if (!(table[PTX(fault_va)] & PERM_USER_MARKED))
 				{	// Page not present
 					env_exit();
 				}
@@ -211,14 +209,10 @@ void fault_handler(struct Trapframe *tf)
 
 
 			if(((perms & PERM_PRESENT) && !(perms & PERM_WRITEABLE)) ){
-				// Page not writable
+				// Page not writable or MARKED
 				env_exit();
 			}
 
-			if(!(perms & PERM_USER))
-			{
-				env_exit();
-			}
 		}
 
 		/*2022: Check if fault due to Access Rights */

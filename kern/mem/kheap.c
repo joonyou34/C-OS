@@ -4,8 +4,11 @@
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
 
+#define KALLOC_START (uint32)limit + PAGE_SIZE
 
 uint32 physToVirt[0xFFFFF000 / 4096];
+uint32 lstAddr = 0;
+uint32 lstPageCt = -1;
 
 // Initialize the dynamic allocator of kernel heap with the given start address, size & limit
 // All pages in the given range should be allocated
@@ -122,9 +125,13 @@ void *kmalloc(unsigned int size)
 	else
 	{
 
-		uint32 pgAllocStartArea = (uint32)limit + PAGE_SIZE;
-		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+		if(numOfPages < lstPageCt) {
+			lstPageCt = numOfPages;
+			lstAddr = KALLOC_START;
+		}
+		uint32 pgAllocStartArea = lstAddr;
+		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
 		// get the first Page Address
@@ -173,6 +180,8 @@ void *kmalloc(unsigned int size)
 
 #define LAST_PAGE 512 // 9TH bit (set when it is the end page in allocation)
 				table[PTX(addr)] |= LAST_PAGE;
+				lstAddr = addr + PAGE_SIZE;
+				lstPageCt = numOfPages;
 			}
 		}
 
@@ -202,15 +211,16 @@ void kfree(void *virtual_address)
 
 		return;
 	}
+	uint32 st = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
 
-	for (uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);; addr += PAGE_SIZE)
+	for (uint32 addr = st;; addr += PAGE_SIZE)
 	{
-
 		uint32 *table;
 		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, addr, &table);
 
 		if (ptr_frame_info == NULL)
 		{
+			lstPageCt = -1;
 			panic("Cannot free an already freed page");
 		}
 
@@ -229,6 +239,10 @@ void kfree(void *virtual_address)
 		free_frame(ptr_frame_info);
 		unmap_frame(ptr_page_directory, addr);
 	}
+
+
+	if(st < lstAddr)
+		lstPageCt = -1;
 }
 
 unsigned int kheap_physical_address(unsigned int virtual_address)
@@ -298,9 +312,13 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	if (virtual_address == NULL)
 	{
 		if (new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
+		{
 			return kmalloc(new_size);
-
-		return alloc_block_FF(new_size);
+		}
+		else
+		{
+			return alloc_block_FF(new_size);
+		}
 	}
 
 	if (new_size == 0)
@@ -309,18 +327,20 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		return NULL;
 	}
 
+
 	uint32 currsize;
 	bool isBlock = 0;
+	uint32 cntr = 0;
 
 	if ((uint32)virtual_address <= (uint32)limit)
-	{ // it was block
-		currsize = get_block_size(virtual_address);
+	{ 
+		// it was block
+		currsize = get_block_size(virtual_address) - sizeof(int) * 2;
 		isBlock = 1;
 	}
-
 	else
-	{ // it was groub of pages
-		uint32 cntr = 0;
+	{
+		// it was group of pages
 		for (uint32 addr = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);; addr += PAGE_SIZE)
 		{
 
@@ -345,36 +365,109 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 	uint32 min_size = MIN(currsize, new_size);
 
-	if (new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it will be groub pages*/
+	if (new_size > DYN_ALLOC_MAX_BLOCK_SIZE) /*it will be group pages*/
 	{
-		// allocate block using kmalloc
-		//  if allocated then copy the memory and free the old
-		//  else then return null
-
-		void *va = kmalloc(new_size);
-
-		if (va != NULL)
+		if(isBlock) /*if it was block*/
 		{
-			memcpy(va, virtual_address, min_size);
-			if (isBlock)
+			void *va = kmalloc(new_size);
+
+			if (va != NULL)
+			{
+				memcpy(va, virtual_address, min_size);
 				free_block(virtual_address);
-			else
-				kfree(virtual_address);
+				return va;
+			}
+			return virtual_address;
 		}
-		return va;
+		else
+		{
+			if(currsize > new_size) /*shrink*/
+			{
+				kfree(virtual_address + new_size * PAGE_SIZE);
+				uint32 newendva = (uint32)virtual_address + ((new_size / PAGE_SIZE) - 1) * PAGE_SIZE;
+				uint32 *table;
+				get_page_table(ptr_page_directory, newendva, &table);
+				table[PTX(newendva)] |= LAST_PAGE;
+			}
+			else /*enlarge*/
+			{
+				uint32 startva = (uint32)virtual_address + currsize;
+				uint32 numOfPages = cntr - (ROUNDUP(new_size, PAGE_SIZE) / PAGE_SIZE);
+				uint32 numOfPages2 = numOfPages;
+				uint32 pagesFound = 0, firstPageAddr = 0;
+				uint8 success = 1;
+				for(uint32 addr = startva; addr < KERNEL_HEAP_MAX; addr += PAGE_SIZE)
+				{
+					uint32 *ptr_table;
+					struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
+					if (frame_info == NULL)
+					{
+						if(allocate_frame(&frame_info) || map_frame(ptr_page_directory,frame_info,addr, PERM_USER | PERM_WRITEABLE | PERM_PRESENT))
+						{
+							for(uint32 revaddr = addr; revaddr > startva; revaddr -= PAGE_SIZE)
+							{
+								free_frame(frame_info);
+								unmap_frame(ptr_page_directory, revaddr);
+							}
+							success = 0;
+							break;
+						}
+					}
+					else
+					{
+						for(uint32 revaddr = addr; revaddr > startva; revaddr -= PAGE_SIZE)
+						{
+							free_frame(frame_info);
+							unmap_frame(ptr_page_directory, revaddr);
+						}
+						success = 0;
+						break;
+					}
+				}
+				if(success)
+				{
+					//allocate the pages you want from the same place
+					//uint32 va = kmalloc(startva);
+					for(uint32 addr = startva; addr < numOfPages * PAGE_SIZE; addr+= PAGE_SIZE)
+					{
+
+					}
+					uint32 prevpage = startva - PAGE_SIZE;
+					uint32 *table;
+					get_page_table(ptr_page_directory, prevpage, &table);
+					table[PTX(prevpage)] &= ~LAST_PAGE;
+					return virtual_address;
+				}
+				else
+				{
+					//reallocate
+					void *va = kmalloc(new_size);
+					if (va != NULL)
+					{
+						memcpy(va, virtual_address, min_size);
+						kfree(virtual_address);
+						return va;
+					}
+				}
+			}
+			return virtual_address;
+		}
 	}
 	else /*it will be block*/
 	{
-		// alocate the block using allocff
-		void *new_block = alloc_block_FF(new_size);
-		if (new_block != NULL)
+		if(isBlock) /*if i was a block*/
 		{
-			memcpy(new_block, virtual_address, min_size);
-			if (isBlock)
-				free_block(virtual_address);
-			else
-				kfree(virtual_address);
+			return realloc_block_FF(virtual_address,new_size);
 		}
-		return new_block;
+		else /*if i was pages*/
+		{
+			void *new_block = alloc_block_FF(new_size);
+			if (new_block != NULL)
+			{
+				memcpy(new_block, virtual_address, min_size);
+				kfree(virtual_address);
+			}
+			return new_block;
+		}
 	}
 }
