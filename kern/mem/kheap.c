@@ -311,14 +311,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 	if (virtual_address == NULL)
 	{
-		if (new_size > DYN_ALLOC_MAX_BLOCK_SIZE)
-		{
-			return kmalloc(new_size);
-		}
-		else
-		{
-			return alloc_block_FF(new_size);
-		}
+		return kmalloc(new_size);
 	}
 
 	if (new_size == 0)
@@ -375,26 +368,24 @@ void *krealloc(void *virtual_address, uint32 new_size)
 			{
 				memcpy(va, virtual_address, min_size);
 				free_block(virtual_address);
-				return va;
 			}
-			return virtual_address;
+			return va;
 		}
 		else
 		{
-			if(currsize > new_size) /*shrink*/
+			uint32 newpages = ROUNDUP(new_size, PAGE_SIZE) / PAGE_SIZE;
+			if(cntr > newpages) /*shrink*/
 			{
-				kfree(virtual_address + new_size * PAGE_SIZE);
-				uint32 newendva = (uint32)virtual_address + ((new_size / PAGE_SIZE) - 1) * PAGE_SIZE;
+				kfree(virtual_address + ROUNDUP(new_size, PAGE_SIZE));
+				uint32 newendva = (uint32)virtual_address + (newpages - 1) * PAGE_SIZE;
 				uint32 *table;
 				get_page_table(ptr_page_directory, newendva, &table);
 				table[PTX(newendva)] |= LAST_PAGE;
 			}
-			else /*enlarge*/
+			else if(cntr < newpages) /*enlarge*/
 			{
 				uint32 startva = (uint32)virtual_address + currsize;
-				uint32 numOfPages = cntr - (ROUNDUP(new_size, PAGE_SIZE) / PAGE_SIZE);
-				uint32 numOfPages2 = numOfPages;
-				uint32 pagesFound = 0, firstPageAddr = 0;
+				uint32 numOfPages = newpages - cntr;
 				uint8 success = 1;
 				for(uint32 addr = startva; addr < KERNEL_HEAP_MAX; addr += PAGE_SIZE)
 				{
@@ -423,15 +414,15 @@ void *krealloc(void *virtual_address, uint32 new_size)
 						success = 0;
 						break;
 					}
+
 				}
 				if(success)
 				{
-					//allocate the pages you want from the same place
-					//uint32 va = kmalloc(startva);
-					for(uint32 addr = startva; addr < numOfPages * PAGE_SIZE; addr+= PAGE_SIZE)
-					{
+					uint32 newendva = (uint32)virtual_address + (newpages - 1) * PAGE_SIZE;
+					uint32 *table2;
+					get_page_table(ptr_page_directory, newendva, &table2);
+					table2[PTX(newendva)] |= LAST_PAGE;
 
-					}
 					uint32 prevpage = startva - PAGE_SIZE;
 					uint32 *table;
 					get_page_table(ptr_page_directory, prevpage, &table);
@@ -446,11 +437,15 @@ void *krealloc(void *virtual_address, uint32 new_size)
 					{
 						memcpy(va, virtual_address, min_size);
 						kfree(virtual_address);
-						return va;
 					}
+					return va;
 				}
 			}
-			return virtual_address;
+			else
+			{
+				return virtual_address;
+			}
+			return NULL;
 		}
 	}
 	else /*it will be block*/
