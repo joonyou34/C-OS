@@ -213,6 +213,10 @@ void fault_handler(struct Trapframe *tf)
 				env_exit();
 			}
 
+			if(fault_va >= USER_LIMIT)
+			{
+				env_exit();
+			}
 		}
 
 		/*2022: Check if fault due to Access Rights */
@@ -292,7 +296,7 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 		{
 			panic("Failed to allocate");
 		}
-		
+
 		map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER);
 
 		// Read the page

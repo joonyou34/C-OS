@@ -326,7 +326,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	uint32 cntr = 0;
 
 	if ((uint32)virtual_address <= (uint32)limit)
-	{ 
+	{
 		// it was block
 		currsize = get_block_size(virtual_address) - sizeof(int) * 2;
 		isBlock = 1;
