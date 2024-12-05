@@ -142,6 +142,20 @@ void FOS_initialize()
 		write_esp(new_sp);
 		cprintf("*	old SP = %x - updated SP = %x\n", old_sp, read_esp());
 	}
+
+	
+	static uint8* fb;
+	cprintf("* 7) GPU?\n");
+	{
+		#define FRAME_BUFF 0xA0000
+		volatile uint8 *fp = (uint8*)(KERNEL_BASE + FRAME_BUFF);
+		fb = (uint8*)fp;
+		for(int x = 0; x < 320; x++) {
+			for(int y = 0; y < 200; y++) {
+				fb[y*320+x]=((y*320+x))/250;
+			}
+		}
+	}
 	cprintf("********************************************************************\n");
 
 	// start the kernel command prompt.

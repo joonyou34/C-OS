@@ -21,6 +21,9 @@ start:		.code16				# This runs in real mode
 		cli				# Disable interrupts
 		cld				# String operations increment
 
+		movb $0x00, %ah
+		movb $0x13, %al
+		int $0x10
 		# Set up the important data segment registers (DS, ES, SS).
 		xorw	%ax,%ax			# Segment number zero
 		movw	%ax,%ds			# -> Data Segment
