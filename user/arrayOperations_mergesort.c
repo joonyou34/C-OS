@@ -15,15 +15,7 @@ void _main(void)
 	int32 parentenvID = sys_getparentenvid();
 
 	int ret;
-
-	/*[1] GET SEMAPHORES*/
-	struct semaphore ready = get_semaphore(parentenvID, "Ready");
-	struct semaphore finished = get_semaphore(parentenvID, "Finished");
-
-	/*[2] WAIT A READY SIGNAL FROM THE MASTER*/
-	wait_semaphore(ready);
-
-	/*[3] GET SHARED VARs*/
+	/*[1] GET SHARED VARs*/
 	//Get the shared array & its size
 	int *numOfElements = NULL;
 	int *sharedArray = NULL;
@@ -31,7 +23,11 @@ void _main(void)
 	numOfElements = sget(parentenvID, "arrSize") ;
 	//PrintElements(sharedArray, *numOfElements);
 
-	/*[4] DO THE JOB*/
+	//Get the check-finishing counter
+	int *finishedCount = NULL;
+	finishedCount = sget(parentenvID, "finishedCount") ;
+
+	/*[2] DO THE JOB*/
 	//take a copy from the original array
 	int *sortedArray;
 
@@ -48,8 +44,8 @@ void _main(void)
 	MSort(sortedArray, 1, *numOfElements);
 	cprintf("Merge sort is Finished!!!!\n") ;
 
-	/*[5] DECLARE FINISHING*/
-	signal_semaphore(finished);
+	/*[3] SHARE THE RESULTS & DECLARE FINISHING*/
+	(*finishedCount)++ ;
 
 }
 
