@@ -152,7 +152,7 @@ void FOS_initialize()
 		fb = (uint8*)fp;
 		for(int x = 0; x < 320; x++) {
 			for(int y = 0; y < 200; y++) {
-				fb[y*320+x]=((y*320+x))/250;
+				fb[y*320+x]= x&255;
 			}
 		}
 	}

@@ -41,8 +41,7 @@ cmain(void)
 	struct Proghdr *ph, *eph;
 
 	// read 1st page off disk
-	readseg((uint32) ELFHDR, SECTSIZE*8, 0);
-
+	readseg((uint32) ELFHDR, SECTSIZE*8, SECTSIZE);
 	// is this a valid ELF?
 	if (ELFHDR->e_magic != ELF_MAGIC)
 		goto bad;
@@ -51,8 +50,8 @@ cmain(void)
 	ph = (struct Proghdr *) ((uint8 *) ELFHDR + ELFHDR->e_phoff);
 	eph = ph + ELFHDR->e_phnum;
 	for (; ph < eph; ph++)
-		readseg(ph->p_va, ph->p_memsz, ph->p_offset);
-
+		readseg(ph->p_va, ph->p_memsz, ph->p_offset + SECTSIZE);
+	// asm volatile("int $0x10");
 	// call the entry point from the ELF header
 	// note: does not return!
 	((void (*)(void)) (ELFHDR->e_entry & 0xFFFFFF))();
