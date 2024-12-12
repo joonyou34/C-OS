@@ -38,6 +38,7 @@ void print_welcome_message();
 bool autograde ;
 void FOS_initialize()
 {
+	
 	//get actual addresses after code linking
 	extern char start_of_uninitialized_data_section[], end_of_kernel[];
 
@@ -84,7 +85,9 @@ void FOS_initialize()
 		//setPageReplacmentAlgorithmNchanceCLOCK();
 		//setPageReplacmentAlgorithmLRU(PG_REP_LRU_TIME_APPROX);
 		setPageReplacmentAlgorithmFIFO();
-		//setPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX);
+
+		// DOZ added code
+		//setPageReplacmentAlgorithmNchanceCLOCK(1);
 
 		setUHeapPlacementStrategyFIRSTFIT();
 		setKHeapPlacementStrategyFIRSTFIT();
@@ -154,7 +157,6 @@ void FOS_initialize()
 	}
 
 	// cprintf("initialize N chance!!!");
-	// setPageReplacmentAlgorithmNchanceCLOCK(500);
 }
 
 

@@ -62,6 +62,8 @@ void _main(void)
 		found = sys_check_WS_list(expectedFinalVAs, 11, 0x807000, 1);
 		if (found != 1) panic("Page Nth clock algo failed.. trace it by printing WS before and after page fault");
 	}
+
+	
 	{
 		if (garbage4 != *ptr) panic("test failed!");
 		if (garbage5 != *ptr2) panic("test failed!");
