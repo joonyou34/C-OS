@@ -152,6 +152,9 @@ void FOS_initialize()
 		cprintf("Type 'help' for a list of commands.\n");
 		get_into_prompt();
 	}
+
+	// cprintf("initialize N chance!!!");
+	// setPageReplacmentAlgorithmNchanceCLOCK(500);
 }
 
 

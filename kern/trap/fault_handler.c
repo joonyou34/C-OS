@@ -283,54 +283,258 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 	uint32 wsSize = env_page_ws_get_size(faulted_env);
 #endif
 
-	if (wsSize < (faulted_env->page_WS_max_size))
-	{
-		// cprintf("PLACEMENT=========================WS Size = %d\n", wsSize);
-		// TODO: [PROJECT'24.MS2 - #09] [2] FAULT HANDLER I - Placement
-		//  Write your code here, remove the panic and write your code
+	if(isPageReplacmentAlgorithmNchanceCLOCK()){
+		
+		fault_va = ROUNDDOWN(fault_va,PAGE_SIZE);
+		//cprintf("WS: %d \n",wsSize);
 
-		// allocate space faulted page
-		struct FrameInfo *frame = NULL;
-		int alloc_result = allocate_frame(&frame);
-		if (alloc_result != 0 || frame==NULL)
+		if (wsSize < (faulted_env->page_WS_max_size))
 		{
-			panic("Failed to allocate");
-		}
+			// cprintf("PLACEMENT=========================WS Size = %d\n", wsSize);
+			// TODO: [PROJECT'24.MS2 - #09] [2] FAULT HANDLER I - Placement
+			//  Write your code here, remove the panic and write your code
 
-		map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER);
-
-		// Read the page
-		int readpagy = pf_read_env_page(faulted_env, (void *)fault_va);
-		if (readpagy == E_PAGE_NOT_EXIST_IN_PF)
-		{
-			//Check if fault_va is outside valid heap and stack ranges
-			bool invalid_heap = (fault_va < USER_HEAP_START || fault_va >= USER_HEAP_MAX);
-			bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va >= USTACKTOP);
-			if ((invalid_heap && invalid_stack))
+			// allocate space faulted page
+			struct FrameInfo *frame = NULL;
+			int alloc_result = allocate_frame(&frame);
+			if (alloc_result != 0 || frame==NULL)
 			{
-				env_exit();
+				panic("Failed to allocate");
 			}
+
+			map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER|PERM_PRESENT);
+
+			// Read the page
+			int readpagy = pf_read_env_page(faulted_env, (void *)fault_va);
+			if (readpagy == E_PAGE_NOT_EXIST_IN_PF)
+			{
+				//Check if fault_va is outside valid heap and stack ranges
+				bool invalid_heap = (fault_va < USER_HEAP_START || fault_va >= USER_HEAP_MAX);
+				bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va >= USTACKTOP);
+				if ((invalid_heap && invalid_stack))
+				{
+					env_exit();
+				}
+			}
+			// Update the working set
+			struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
+			LIST_INSERT_TAIL(&(faulted_env->page_WS_list),NEW_ELEMENTY);
+			if (LIST_SIZE((&faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)//if Working set = max size make it circular linked list
+			{
+				faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+			}
+			else//if not then insert tail and tail points to null
+			{
+				faulted_env->page_last_WS_element = LIST_LAST(&(faulted_env->page_WS_list));
+			}
+			// faulted_env->page_last_WS_element = LIST_LAST(&(faulted_env->page_WS_list));
+
+			//cprintf("allocated\n");
+			/*============================================================================================*/
 		}
-		// Update the working set
-		struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
-		LIST_INSERT_TAIL(&(faulted_env->page_WS_list),NEW_ELEMENTY);
-		if (LIST_SIZE((&faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)//if Working set = max size make it circular linked list
+		else
 		{
-			faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+			// cprintf("REPLACEMENT=========================WS Size = %d\n", wsSize);
+			// refer to the project presentation and documentation for details
+			// TODO: [PROJECT'24.MS3] [2] FAULT HANDLER II - Replacement
+			//  Write your code here, remove the panic and write your code
+			//panic("page_fault_handler() Replacement is not implemented yet...!!");
+			//cprintf("HERE\n");
+			// struct WorkingSetElement*looper;
+			// LIST_FOREACH(looper,&faulted_env->page_WS_list){
+			// 	cprintf("add: %d \n",looper->virtual_address);
+			// }
+			int N_ = page_WS_max_sweeps;
+			int N_mod = N_;
+			// cprintf("N: %d \n",N_);
+			if(N_<0){
+				N_ = N_*-1;
+				N_mod = N_ + 1;
+			}
+			
+			int to_brk = 1;
+			// int threshold_loop = 100000000;
+			while(to_brk){
+				// cprintf("HERE");
+				uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+				
+				// if used, then make it unused and reset the sweeps and move next
+				if((perms&PERM_USED) == PERM_USED){
+					// used page, so start
+					// cprintf("used: ");
+					// cprintf("%d",faulted_env->page_last_WS_element->sweeps_counter);
+					// cprintf("\n");
+					pt_set_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address,perms,PERM_USED);
+					faulted_env->page_last_WS_element->sweeps_counter = 0;
+
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+						//cprintf("move First\n");
+					}
+					else
+					{
+						//cprintf("move Next\n");
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					continue;
+				}
+
+
+				if((perms&PERM_MODIFIED) == PERM_MODIFIED){ // use N_mod
+					if(faulted_env->page_last_WS_element->sweeps_counter >= N_mod){ // replace it
+						uint32 *ptr_page_table = NULL;
+						int FLAG = get_page_table(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
+						if(FLAG == TABLE_NOT_EXIST){
+							panic("Table not exist,(page fault handler)\n");
+							return;
+						}
+						struct FrameInfo* ptr_frame_info = get_frame_info(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
+						
+						// may be a FOS error here, the fos function should return but in the implementation it dont
+						pf_update_env_page(faulted_env,faulted_env->page_last_WS_element->virtual_address,ptr_frame_info);
+
+						unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+						// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
+						break;
+					}else{
+						faulted_env->page_last_WS_element->sweeps_counter++;
+						// move pointer in cycle
+						if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+						{
+							faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+						}
+						else
+						{
+							faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+						}
+						continue;
+					}
+				}else{
+					if(faulted_env->page_last_WS_element->sweeps_counter >= N_){ // replace it
+						unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+						// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
+						break;
+					}else{
+						faulted_env->page_last_WS_element->sweeps_counter++;
+						// move pointer in cycle
+						if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+						{
+							faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+						}
+						else
+						{
+							faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+						}
+						continue;
+					}
+				}
+			}
+
+			//cprintf ("lst: %d\n",faulted_env->page_last_WS_element->virtual_address);
+			
+			//page_fault_handler(faulted_env,fault_va);
+			
+			{// place it
+				struct FrameInfo *frame = NULL;
+				int alloc_result = allocate_frame(&frame);
+				if (alloc_result != 0 || frame==NULL)
+				{
+					panic("Failed to allocate");
+				}
+
+				map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER|PERM_PRESENT);
+				//frame->bufferedVA = fault_va;
+
+				// Read the page
+				int readpagy = pf_read_env_page(faulted_env, (void *)fault_va);
+				if (readpagy == E_PAGE_NOT_EXIST_IN_PF)
+				{
+					//Check if fault_va is outside valid heap and stack ranges
+					bool invalid_heap = (fault_va < USER_HEAP_START || fault_va >= USER_HEAP_MAX);
+					bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va >= USTACKTOP);
+					if ((invalid_heap && invalid_stack))
+					{
+						env_exit();
+					}
+				}
+				// Update the working set
+				//struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
+				faulted_env->page_last_WS_element->virtual_address = fault_va;
+				//LIST_REMOVE(&faulted_env->page_WS_list,faulted_env->page_last_WS_element);
+				//cprintf("upd size: %d\n",faulted_env->page_WS_list.size);
+
+				//LIST_INSERT_TAIL(&(faulted_env->page_WS_list),NEW_ELEMENTY);
+				// move pointer in cycle
+				if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+				{
+					faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+				}
+				else
+				{
+					faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+				}
+				// faulted_env->page_last_WS_element = LIST_LAST(&(faulted_env->page_WS_list));
+
+				//cprintf("allocated\n");
+
+			}
+			struct WorkingSetElement*looper_;
+			// LIST_FOREACH(looper_,&faulted_env->page_WS_list){
+			// 	cprintf("add: %d \n",looper_->virtual_address);
+			// }
+			//cprintf("END HERE\n");
 		}
-		else//if not then insert tail and tail points to null
+	}else{
+		fault_va = ROUNDDOWN(fault_va,PAGE_SIZE);
+		//cprintf("WS: %d \n",wsSize);
+
+		if (wsSize < (faulted_env->page_WS_max_size))
 		{
-			faulted_env->page_last_WS_element = NULL;
+			// cprintf("PLACEMENT=========================WS Size = %d\n", wsSize);
+			// TODO: [PROJECT'24.MS2 - #09] [2] FAULT HANDLER I - Placement
+			//  Write your code here, remove the panic and write your code
+
+			// allocate space faulted page
+			struct FrameInfo *frame = NULL;
+			int alloc_result = allocate_frame(&frame);
+			if (alloc_result != 0 || frame==NULL)
+			{
+				panic("Failed to allocate");
+			}
+
+			map_frame(faulted_env->env_page_directory, frame, fault_va, PERM_WRITEABLE | PERM_USER|PERM_PRESENT);
+
+			// Read the page
+			int readpagy = pf_read_env_page(faulted_env, (void *)fault_va);
+			if (readpagy == E_PAGE_NOT_EXIST_IN_PF)
+			{
+				//Check if fault_va is outside valid heap and stack ranges
+				bool invalid_heap = (fault_va < USER_HEAP_START || fault_va >= USER_HEAP_MAX);
+				bool invalid_stack = (fault_va < USTACKBOTTOM || fault_va >= USTACKTOP);
+				if ((invalid_heap && invalid_stack))
+				{
+					env_exit();
+				}
+			}
+			// Update the working set
+			struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
+			LIST_INSERT_TAIL(&(faulted_env->page_WS_list),NEW_ELEMENTY);
+			if (LIST_SIZE((&faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)//if Working set = max size make it circular linked list
+			{
+				faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+			}
+			else//if not then insert tail and tail points to null
+			{
+				faulted_env->page_last_WS_element = LIST_LAST(&(faulted_env->page_WS_list));
+			}
+			// faulted_env->page_last_WS_element = LIST_LAST(&(faulted_env->page_WS_list));
+
+			//cprintf("allocated\n");
+			/*============================================================================================*/
 		}
-		/*============================================================================================*/
-	}
-	else
-	{
-		// cprintf("REPLACEMENT=========================WS Size = %d\n", wsSize);
-		// refer to the project presentation and documentation for details
-		// TODO: [PROJECT'24.MS3] [2] FAULT HANDLER II - Replacement
-		//  Write your code here, remove the panic and write your code
-		panic("page_fault_handler() Replacement is not implemented yet...!!");
+		//panic("pag fault new error~");
 	}
 }
 
