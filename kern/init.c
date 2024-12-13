@@ -27,6 +27,8 @@
 #include <kern/tests/test_commands.h>
 #include <kern/disk/pagefile_manager.h>
 
+#include <inc/vesa_info.h>
+
 extern int sys_calculate_free_frames();
 
 //Functions Declaration
@@ -36,7 +38,7 @@ void print_welcome_message();
 
 //First ever function called in FOS kernel
 bool autograde ;
-void FOS_initialize()
+void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 {
 	//get actual addresses after code linking
 	extern char start_of_uninitialized_data_section[], end_of_kernel[];
@@ -144,17 +146,29 @@ void FOS_initialize()
 	}
 
 	
-	static uint8* fb;
+	static uint32* fb;
 	cprintf("* 7) GPU?\n");
 	{
-		#define FRAME_BUFF 0xA0000
-		volatile uint8 *fp = (uint8*)(KERNEL_BASE + FRAME_BUFF);
-		fb = (uint8*)fp;
-		for(int x = 0; x < 320; x++) {
-			for(int y = 0; y < 200; y++) {
-				fb[y*320+x]= x&255;
-			}
-		}
+		// cprintf("A1: %x, A2: %x", VESA_mode_info, ((struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE)))->framebuffer);
+		// struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
+
+		// volatile uint32 *fp = (uint32*)(mode_info->framebuffer + KERNEL_BASE);
+		// uint32 w = mode_info->width, h = mode_info->height;
+		// fb = (uint32*)fp;
+		// cprintf("address: %x", fb);
+		// for(int x = 0; x < w; x++) {
+		// 	for(int y = 0; y < h; y++) {
+		// 		fb[y*w+x]= 0xFFFFFFFF;
+		// 	}
+		// }
+		// #define FRAME_BUFF 0xA0000
+		// volatile uint8 *fp = (uint8*)(KERNEL_BASE + FRAME_BUFF);
+		// fb = (uint8*)fp;
+		// for(int x = 0; x < 320; x++) {
+		// 	for(int y = 0; y < 200; y++) {
+		// 		fb[y*320+x]= x&255;
+		// 	}
+		// }
 	}
 	cprintf("********************************************************************\n");
 

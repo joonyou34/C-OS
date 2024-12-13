@@ -24,7 +24,26 @@ start:		.code16				# This runs in real mode
 
 		# Set up the stack pointer, growing downward from 0x7c00.
 		movw	$start,%sp         	# Stack Pointer
-	
+
+		# initiate video mode switch
+		movw	$0x4f02, %ax
+        movw	$0x4118, %bx
+        int	$0x10
+
+		# in case the mode set was successful, spin
+		jc      spin
+		
+		# retrieve mode info for mode 0x118
+		lea     VesaModeInfoBlock, %di  
+		movw    %cs, %ax           
+		movw    %ax, %es           
+		movw    $0x4f01, %ax       
+		movw    $0x0118, %cx       
+		int     $0x10              
+
+		# in case the mode info query was successful, spin
+		jc      spin           
+
 # Enable A20:
 #   For fascinating historical reasons (related to the fact that
 #   the earliest 8086-based PCs could only address 1MB of physical memory
@@ -57,9 +76,51 @@ seta20.2:	inb	$0x64,%al		# Get status
 
 	int $0x13             # BIOS interrupt to read the disk
 
-	jc read_failed
+	jc spin
 
-jmp 0x8000
+	lea     VesaModeInfoBlock, %eax    # Load the address of Mode Info Block
 
-read_failed:
-	jmp read_failed
+	jmp 0x8000
+
+spin:
+	jmp spin
+
+# the mode info block struct, reference: https://wiki.osdev.org/VESA_Video_Modes
+.align 4
+VesaModeInfoBlock:
+    ModeAttributes:        .space 2         
+    FirstWindowAttributes: .space 1         
+    SecondWindowAttributes:.space 1         
+    WindowGranularity:     .space 2         
+    WindowSize:            .space 2         
+    FirstWindowSegment:    .space 2         
+    SecondWindowSegment:   .space 2         
+    WindowFunctionPtr:     .space 4         
+    BytesPerScanLine:      .space 2         
+
+    Width:                 .space 2         
+    Height:                .space 2         
+    CharWidth:             .space 1         
+    CharHeight:            .space 1         
+    PlanesCount:           .space 1         
+    BitsPerPixel:          .space 1         
+    BanksCount:            .space 1         
+    MemoryModel:           .space 1         
+    BankSize:              .space 1         
+    ImagePagesCount:       .space 1         
+    Reserved1:             .space 1         
+
+    RedMaskSize:           .space 1         
+    RedFieldPosition:      .space 1         
+    GreenMaskSize:         .space 1         
+    GreenFieldPosition:    .space 1         
+    BlueMaskSize:          .space 1         
+    BlueFieldPosition:     .space 1         
+    ReservedMaskSize:      .space 1         
+    ReservedMaskPosition:  .space 1         
+    DirectColorModeInfo:   .space 1         
+
+    LFBAddress:            .space 4         
+    OffscreenMemoryOffset: .space 4         
+    OffscreenMemorySize:   .space 2         
+    Reserved2:             .space 206 

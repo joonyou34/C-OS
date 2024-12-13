@@ -44,6 +44,7 @@
 
 .globl		start_of_kernel
 start_of_kernel:
+	movl    4(%esp), %ebx
 	movw	$0x1234,0x472			# warm boot
 
 	# Establish our own GDT in place of the boot loader's temporary GDT.
@@ -64,11 +65,12 @@ relocated:
 	movl	$0x0,%ebp			# nuke frame pointer
 
     # Leave a few words on the stack for the user trap frame
-	#2024: this line is changed since the trapframe is move to the user kernel stack of each process
-	#movl	$(ptr_stack_top-SIZEOF_STRUCT_TRAPFRAME),%esp
+	# 2024: this line is changed since the trapframe is move to the user kernel stack of each process
+	# movl	$(ptr_stack_top-SIZEOF_STRUCT_TRAPFRAME),%esp
 	movl	$(ptr_stack_top),%esp
 
 	# now to C code
+	pushl %ebx
 	call	FOS_initialize
 
 	# Should never get here, but in case we do, just spin.

@@ -5,13 +5,10 @@
 	
 .globl start2					# Entry point	
 start2:		.code16				# This runs in real mode
+		mov %eax, %ebx
         # initiate videomode
-		movb $0x00, %ah
-        movb $0x13, %al
-        int $0x10
-
-        # movw $0x4f02, %ax
-        # movw $0x118, %bx
+		# movb $0x00, %ah
+        # movb $0x13, %al
         # int $0x10
 
 # Switch from real to protected mode:
@@ -48,8 +45,9 @@ protcseg:	.code32
 		movw	%ax, %fs		# -> FS
 		movw	%ax, %gs		# -> GS
 		movw	%ax, %ss		# -> SS: Stack Segment
-        
-		call cmain			# finish the boot load from C.
+
+		push	%ebx
+		call	cmain			# finish the boot load from C.
 						# cmain() should not return
 spin:		jmp spin			# ..but in case it does, spin
 	

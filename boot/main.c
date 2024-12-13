@@ -1,5 +1,6 @@
 #include <inc/x86.h>
 #include <inc/elf.h>
+#include <inc/vesa_info.h>
 
 /**********************************************************************
  * This a dirt simple boot loader, whose sole job is to boot
@@ -36,9 +37,20 @@ void readsect(void*, uint32);
 void readseg(uint32, uint32, uint32);
 
 void
-cmain(void)
+cmain(struct vbe_mode_info_structure* mode_info)
 {
 	struct Proghdr *ph, *eph;
+
+	// struct vbe_mode_info_structure* VESA_INFO = (struct vbe_mode_info_structure*)(((char*)mode_info + 0));
+
+	// volatile uint32 *fp = (uint32*)(VESA_INFO->framebuffer + 0);
+	// uint32 w = VESA_INFO->width, h = VESA_INFO->height;
+	// uint32* fb = (uint32*)fp;
+	// for(int x = 0; x < w; x++) {
+	// 	for(int y = 0; y < h; y++) {
+	// 		fb[y*w+x]= 0xFFFFFFFF;
+	// 	}
+	// }
 
 	// read 1st page off disk
 	readseg((uint32) ELFHDR, SECTSIZE*8, SECTSIZE);
@@ -51,10 +63,10 @@ cmain(void)
 	eph = ph + ELFHDR->e_phnum;
 	for (; ph < eph; ph++)
 		readseg(ph->p_va, ph->p_memsz, ph->p_offset + SECTSIZE);
-	// asm volatile("int $0x10");
+		
 	// call the entry point from the ELF header
 	// note: does not return!
-	((void (*)(void)) (ELFHDR->e_entry & 0xFFFFFF))();
+	((void (*)(void *)) (ELFHDR->e_entry & 0xFFFFFF))((void*)mode_info);
 
 bad:
 	outw(0x8A00, 0x8A00);
