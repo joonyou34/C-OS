@@ -52,6 +52,11 @@ enum
 	SYS_sbrk,
 	SYS_allocate_user_mem,
 	SYS_free_user_mem,
+	SYS_init_queue,
+	SYS_enqueue,
+	SYS_remove_from_queue,
+	SYS_pushcli,
+	SYS_popcli,
 	//=====================================================================
 	NSYSCALLS
 };
