@@ -150,17 +150,43 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 	cprintf("* 7) GPU?\n");
 	{
 		// cprintf("A1: %x, A2: %x", VESA_mode_info, ((struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE)))->framebuffer);
-		// struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
+		struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
 
-		// volatile uint32 *fp = (uint32*)(mode_info->framebuffer + KERNEL_BASE);
-		// uint32 w = mode_info->width, h = mode_info->height;
-		// fb = (uint32*)fp;
-		// cprintf("address: %x", fb);
-		// for(int x = 0; x < w; x++) {
-		// 	for(int y = 0; y < h; y++) {
-		// 		fb[y*w+x]= 0xFFFFFFFF;
-		// 	}
-		// }
+		uint32 sz = ROUNDUP(mode_info->width*mode_info->height, PAGE_SIZE);
+		uint32 lim = mode_info->framebuffer+sz;
+		uint32 page_it;
+		if(searchPages(sz/PAGE_SIZE, &page_it))
+			panic("NOT ENOUGH PAGES FOR GPU");
+
+		bool lock_already_held = holding_spinlock(&MemFrameLists.mfllock);
+		if (!lock_already_held)
+		{
+			acquire_spinlock(&MemFrameLists.mfllock);
+		}
+
+		// TODO: MAKE THIS WORK AAAAAAAAAAAAAAAAAA
+		for(uint32 pa = ROUNDDOWN(mode_info->framebuffer, PAGE_SIZE); pa < lim; pa += PAGE_SIZE) {
+			cprintf("addres: %x, in_decimal: %d, frame: %d, num_of_frames: %d\n", pa, pa, (pa>>12), number_of_frames);
+			struct FrameInfo* frame_info = to_frame_info(pa);
+			LIST_REMOVE(&MemFrameLists.free_frame_list, frame_info);
+			initialize_frame_info(frame_info);
+			map_frame(ptr_page_directory, frame_info, page_it, PERM_WRITEABLE);
+			page_it += PAGE_SIZE;
+		}
+
+		if (!lock_already_held)
+		{
+			release_spinlock(&MemFrameLists.mfllock);
+		}
+
+		volatile uint32 *fp = (uint32*)kheap_virtual_address(mode_info->framebuffer);
+		uint32 w = mode_info->width, h = mode_info->height;
+		fb = (uint32*)fp;
+		for(int x = 0; x < w; x++) {
+			for(int y = 0; y < h; y++) {
+				fb[y*w+x]= 0xFFFFFFFF;
+			}
+		}
 		// #define FRAME_BUFF 0xA0000
 		// volatile uint8 *fp = (uint8*)(KERNEL_BASE + FRAME_BUFF);
 		// fb = (uint8*)fp;
