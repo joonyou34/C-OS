@@ -146,45 +146,47 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 	}
 
 	
-	static uint32* fb;
+	static uint8* fb;
 	cprintf("* 7) GPU?\n");
 	{
 		// cprintf("A1: %x, A2: %x", VESA_mode_info, ((struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE)))->framebuffer);
 		struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
 
-		uint32 sz = ROUNDUP(mode_info->width*mode_info->height, PAGE_SIZE);
+		uint32 sz = mode_info->width * mode_info->height * sizeof(int);
 		uint32 lim = mode_info->framebuffer+sz;
-		uint32 page_it;
-		if(searchPages(sz/PAGE_SIZE, &page_it))
-			panic("NOT ENOUGH PAGES FOR GPU");
+		uint32 page_it = 0xef000000;
+		uint32 *ptr_page_table;
 
-		bool lock_already_held = holding_spinlock(&MemFrameLists.mfllock);
-		if (!lock_already_held)
-		{
-			acquire_spinlock(&MemFrameLists.mfllock);
+		uint32 page_directory_entry = ptr_page_directory[PDX(page_it)];
+
+		if ((page_directory_entry & PERM_PRESENT) == PERM_PRESENT)
+			ptr_page_table = (void*)kheap_virtual_address(EXTRACT_ADDRESS(page_directory_entry));
+		else {
+			ptr_page_table = kmalloc(PAGE_SIZE);
+			ptr_page_directory[PDX(page_it)] = CONSTRUCT_ENTRY(
+				kheap_physical_address((unsigned int)ptr_page_table)
+				, PERM_PRESENT | PERM_USER | PERM_WRITEABLE);
+
+			//================
+			memset(ptr_page_table, 0, PAGE_SIZE);
+			tlbflush();
 		}
 
-		// TODO: MAKE THIS WORK AAAAAAAAAAAAAAAAAA
-		for(uint32 pa = ROUNDDOWN(mode_info->framebuffer, PAGE_SIZE); pa < lim; pa += PAGE_SIZE) {
-			cprintf("addres: %x, in_decimal: %d, frame: %d, num_of_frames: %d\n", pa, pa, (pa>>12), number_of_frames);
-			struct FrameInfo* frame_info = to_frame_info(pa);
-			LIST_REMOVE(&MemFrameLists.free_frame_list, frame_info);
-			initialize_frame_info(frame_info);
-			map_frame(ptr_page_directory, frame_info, page_it, PERM_WRITEABLE);
+		for(uint32 pa = mode_info->framebuffer; pa < lim; pa += PAGE_SIZE) {
+			uint32 pte_available_bits = ptr_page_table[PTX(page_it)] & PERM_AVAILABLE;
+			ptr_page_table[PTX(page_it)] = CONSTRUCT_ENTRY(pa, pte_available_bits | PERM_WRITEABLE | PERM_PRESENT);
+			
 			page_it += PAGE_SIZE;
 		}
 
-		if (!lock_already_held)
-		{
-			release_spinlock(&MemFrameLists.mfllock);
-		}
-
-		volatile uint32 *fp = (uint32*)kheap_virtual_address(mode_info->framebuffer);
 		uint32 w = mode_info->width, h = mode_info->height;
-		fb = (uint32*)fp;
-		for(int x = 0; x < w; x++) {
-			for(int y = 0; y < h; y++) {
-				fb[y*w+x]= 0xFFFFFFFF;
+		fb = (uint8*)0xef000000;
+		for(int y = 0; y < h; y++) {
+			for(int x = 0; x < w; x++) {
+				uint32 idx = (y*w+x)*3;
+				fb[idx] = (x*255)/w;			//blue
+				fb[idx+1] = ((x*255)/w)/2;		//green
+				fb[idx+2] = ((w-x-1)*255)/w;	//red
 			}
 		}
 		// #define FRAME_BUFF 0xA0000

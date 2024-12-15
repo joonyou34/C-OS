@@ -103,42 +103,6 @@ void *sbrk(int numOfPages)
 	return (void *)old;
 }
 
-
-// numOfPages is the required number of pages
-// first_page_address is a return paramater for the address of the first page found
-// allocation start area and end area are if you want to search in a specific area for the pages (mainly used for faster allocation)
-// returns 0 on success
-bool searchPagesInArea(uint32 numOfPages, uint32* first_page_address, uint32 pgAllocStartArea, uint32 pgAllocEndArea) {
-	uint32 pagesFound = 0, firstPageAddr = 0;
-	for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
-	{
-		uint32 *ptr_table;
-		struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
-		if (frame_info == NULL)
-		{
-			if (pagesFound == 0)
-				firstPageAddr = addr;
-			pagesFound++;
-			if (pagesFound == numOfPages)
-				return 0;
-		}
-		else
-		{
-			pagesFound = 0;
-			firstPageAddr = 0;
-		}
-	}
-	*first_page_address = firstPageAddr;
-	return pagesFound != numOfPages;
-}
-
-// numOfPages is the required number of pages
-// first_page_address is a return paramater for the address of the first page found
-// returns 0 on success
-bool searchPages(uint32 numOfPages, uint32* first_page_address) {
-	return searchPagesInArea(numOfPages, first_page_address, KALLOC_START, KERNEL_HEAP_MAX);
-}
-
 // TODO: [PROJECT'24.MS2 - BONUS#2] [1] KERNEL HEAP - Fast Page Allocator
 
 void *kmalloc(unsigned int size)
@@ -168,11 +132,29 @@ void *kmalloc(unsigned int size)
 		}
 		uint32 pgAllocStartArea = lstAddr;
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
-		uint32 firstPageAddr = 0;
+		uint32 pagesFound = 0, firstPageAddr = 0;
 
 		// get the first Page Address
+		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
+		{
+			uint32 *ptr_table;
+			struct FrameInfo *frame_info = get_frame_info(ptr_page_directory, addr, &ptr_table);
+			if (frame_info == NULL)
+			{
+				if (pagesFound == 0)
+					firstPageAddr = addr;
+				pagesFound++;
+				if (pagesFound == numOfPages)
+					break;
+			}
+			else
+			{
+				pagesFound = 0;
+				firstPageAddr = 0;
+			}
+		}
 
-		if (searchPagesInArea(numOfPages, &firstPageAddr, pgAllocStartArea, pgAllocEndArea))
+		if (pagesFound < numOfPages)
 			return NULL;
 
 		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
