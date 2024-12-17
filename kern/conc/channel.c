@@ -78,7 +78,7 @@ void wakeup_one(struct Channel *chan)
 
 		struct Env *ready = dequeue(&(chan->queue)); 
 		
-		sched_insert_ready0(ready);
+		sched_insert_ready(ready);
 
 		release_spinlock(&ProcessQueues.qlock);
 	}
