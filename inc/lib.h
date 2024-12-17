@@ -43,7 +43,7 @@ int		sys_cgetc(void);
 void 	sys_cputc(const char c);
 void 	sys_lock_cons(void);
 void 	sys_unlock_cons(void);
-
+void    sys_env_set_priority(uint32 , int);
 //User Env
 int32	sys_getenvindex(void);
 int32	sys_getenvid(void);
