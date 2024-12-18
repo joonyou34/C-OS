@@ -54,13 +54,14 @@ enum
 	SYS_free_user_mem,
 	SYS_init_queue,
 	SYS_enqueue,
-	SYS_remove_from_queue,
+	SYS_dequeue,
 	SYS_pushcli,
 	SYS_popcli,
 	SYS_sleep,
 	SYS_wakeup_one,
 	SYS_get_cpu_proc,
 	SYS_sched,
+	SYS_sched_insert_ready,
 	//=====================================================================
 	NSYSCALLS
 };

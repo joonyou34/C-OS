@@ -85,12 +85,13 @@ int 	sys_pf_calculate_allocated_pages(void);
 
 //Semaphores
 void    sys_init_queue(struct Env_Queue *queue);
-void    sys_enqueue(struct Env_Queue *queue, struct Env *env);
-void    sys_remove_from_queue(struct Env_Queue *queue, struct Env *env);
+void    sys_enqueue(struct Env_Queue *queue, struct semaphore *sem);
+void    sys_dequeue(struct Env_Queue *queue);
 void    sys_pushcli();
 void    sys_popcli();
 void    sys_sched();
 struct Env *    sys_get_cpu_proc(void);
+void    sys_sched_insert_ready(struct Env* env);
 
 //Sharing
 //2017

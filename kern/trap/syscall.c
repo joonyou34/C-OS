@@ -356,14 +356,26 @@ void sys_init_queue(struct Env_Queue *queue)
 	return init_queue(queue);
 }
 
-void sys_enqueue(struct Env_Queue *queue, struct Env *env)
+void sys_enqueue(struct Env_Queue *queue, struct semaphore *sem)
 {
-	return enqueue(queue, env);
+	acquire_spinlock(&ProcessQueues.qlock);
+	
+	cur_env->env_status = ENV_BLOCKED;
+	enqueue(queue, cur_env);
+	sem->semdata->lock = 0;
+	sched();
+	release_spinlock(&ProcessQueues.qlock);
+	return;
 }
 
-void sys_remove_from_queue(struct Env_Queue *queue, struct Env *env)
+void sys_dequeue(struct Env_Queue *queue)
 {
-	return remove_from_queue(queue, env);
+
+	acquire_spinlock(&ProcessQueues.qlock);
+	struct Env * e = dequeue(queue);
+	sched_insert_ready(e);
+	release_spinlock(&ProcessQueues.qlock);
+	return;
 }
 
 struct Env * sys_get_cpu_proc(void)
@@ -374,6 +386,11 @@ struct Env * sys_get_cpu_proc(void)
 void sys_sched()
 {
 	return sched();
+}
+
+void sys_sched_insert_ready(struct Env* env)
+{
+	return sched_insert_ready(env);
 }
 
 /*******************************/
@@ -491,10 +508,6 @@ int sys_create_env(char *programName, unsigned int page_WS_size, unsigned int LR
 void sys_run_env(int32 envId)
 {
 	sched_run_env(envId);
-}
-void sys_env_set_priority(int32 envID, int priority){
-
-	env_set_priority(envID , priority);
 }
 
 //====================================
@@ -712,12 +725,13 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		return 0;
 
 	case SYS_enqueue:
-		sys_enqueue((struct Env_Queue *)a1, (struct Env *)a2);
+		sys_enqueue((struct Env_Queue *)a1, (struct semaphore *) a2);
 		return 0;
 
-	case SYS_remove_from_queue:
-		sys_remove_from_queue((struct Env_Queue *)a1, (struct Env *)a2);
-		return 0;
+	case SYS_dequeue:
+		
+		sys_dequeue((struct Env_Queue *)a1);
+		return 0; 
 
 	case SYS_get_cpu_proc:
 		return (uint32)sys_get_cpu_proc();
@@ -726,12 +740,13 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		sys_sched();
 		return 0;
 
+	case SYS_sched_insert_ready:
+		sys_sched_insert_ready((struct Env *) a1);
+		return 0;
+
 	case NSYSCALLS:
 		return -E_INVAL;
 		break;
-	case SYS_env_set_priority:
-		return sys_env_set_priority((uint32*)a1 , (int) a2);
-	
 	}
 	// panic("syscall not implemented");
 	return -E_INVAL;

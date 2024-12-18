@@ -79,7 +79,7 @@ struct Command commands[] =
 		//********************************//
 		{ "rub", "reads block of bytes from specific location in given environment" ,command_readuserblock, 3},
 		//TODO: [PROJECT'24.MS3 - #07] [3] PRIORITY RR Scheduler - initialize command
-		{ "schedPRIRR", "Switch & initialize the scheduler to PRIORITY RR with given #priorities, quantum and starvation threshold" ,command_schedPRIRR, 3},
+		//{ "schedPRIRR", "Switch & initialize the scheduler to PRIORITY RR with given #priorities, quantum and starvation threshold" ,command_schedPRIRR, 3},
 
 		//**************************************//
 		/* COMMANDS WITH AT LEAST ONE ARGUMENT */

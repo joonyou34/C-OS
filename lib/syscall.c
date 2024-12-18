@@ -313,14 +313,14 @@ void sys_init_queue(struct Env_Queue *queue)
 	syscall(SYS_init_queue, (uint32)queue, 0, 0, 0, 0);
 }
 
-void sys_enqueue(struct Env_Queue *queue, struct Env *env)
+void sys_enqueue(struct Env_Queue *queue, struct semaphore *sem)
 {
-	syscall(SYS_enqueue, (uint32)queue, (uint32)env, 0, 0, 0);
+	syscall(SYS_enqueue, (uint32)queue, (uint32) sem, 0, 0, 0);
 }
 
-void sys_remove_from_queue(struct Env_Queue *queue, struct Env *env)
+void sys_dequeue(struct Env_Queue *queue)
 {
-	syscall(SYS_remove_from_queue, (uint32)queue, (uint32)env, 0, 0, 0);
+	syscall(SYS_dequeue, (uint32)queue, 0, 0, 0, 0);
 }
 
 void sys_pushcli()
@@ -335,10 +335,15 @@ void sys_popcli()
 
 struct Env * sys_get_cpu_proc()
 {
-	return (void *)syscall(SYS_get_cpu_proc, 0, 0, 0, 0, 0);
+	return (struct Env *)syscall(SYS_get_cpu_proc, 0, 0, 0, 0, 0);
 }
 
 void sys_sched()
 {
 	syscall(SYS_sched, 0, 0, 0, 0, 0);
+}
+
+void sys_sched_insert_ready(struct Env* env)
+{
+	syscall(SYS_sched_insert_ready, (uint32)env, 0, 0, 0, 0);
 }
