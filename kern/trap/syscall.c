@@ -492,6 +492,10 @@ void sys_run_env(int32 envId)
 {
 	sched_run_env(envId);
 }
+void sys_env_set_priority(int32 envID, int priority){
+
+	env_set_priority(envID , priority);
+}
 
 //====================================
 /*******************************/
@@ -725,6 +729,9 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 	case NSYSCALLS:
 		return -E_INVAL;
 		break;
+	case SYS_env_set_priority:
+		return sys_env_set_priority((uint32*)a1 , (int) a2);
+	
 	}
 	// panic("syscall not implemented");
 	return -E_INVAL;

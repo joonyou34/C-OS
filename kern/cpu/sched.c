@@ -249,14 +249,27 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	//TODO: [PROJECT'24.MS3 - #07] [3] PRIORITY RR Scheduler - sched_init_PRIRR
 	//Your code is here
 	//Comment the following line
-	panic("Not implemented yet");
+	// panic("Not implemented yet");
 
 
+	if (ProcessQueues.qlock.locked){
+        panic("You cannot access the queue");
+    }
 
+	acquire_spinlock(&ProcessQueues.qlock);
 
+	kclock_set_quantum(quantum);
 
+	num_of_ready_queues = numOfPriorities;
+	struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues;
+	while(numOfPriorities--){
+		init_queue(ProcessQueues.env_ready_queues);
+		curr_queue++;
+	}
+	
+	sched_set_starv_thresh(starvThresh);
 
-
+	release_spinlock(&ProcessQueues.qlock);
 
 
 	//=========================================
@@ -364,7 +377,29 @@ void clock_interrupt_handler(struct Trapframe* tf)
 		//TODO: [PROJECT'24.MS3 - #09] [3] PRIORITY RR Scheduler - clock_interrupt_handler
 		//Your code is here
 		//Comment the following line
-		panic("Not implemented yet");
+		// panic("Not implemented yet");
+
+		if (ProcessQueues.qlock.locked){
+        	panic("You cannot access the queue");
+    	}
+
+		acquire_spinlock(&ProcessQueues.qlock);
+
+		for(uint8 i = num_of_ready_queues-1; i ; i--){
+			struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues + i; 
+			uint32 size = queue_size(curr_queue);
+			for(struct Env* proc = (struct Env*)curr_queue; size--; proc++){
+				if(proc->nClocks >= starvation_threshold){
+					proc->nClocks -= starvation_threshold;
+					proc->priority--;
+					remove_from_queue(curr_queue, proc);
+					enqueue(&(ProcessQueues.env_ready_queues[proc->priority]), proc);
+				}
+			}
+		}
+
+		release_spinlock(&ProcessQueues.qlock);
+
 	}
 
 

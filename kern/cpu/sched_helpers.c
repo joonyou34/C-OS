@@ -705,11 +705,26 @@ void env_set_priority(int envID, int priority)
 
 	//Get the process of the given ID
 	struct Env* proc ;
-	envid2env(envID, &proc, 0);
+	//envid2env(envID, &proc, 0);
+	if (envid2env(envID, &proc, 0) != 0) {
+        panic("Invalid envID");
+    }
 
 	//Your code is here
 	//Comment the following line
-	panic("Not implemented yet");
+	//panic("Not implemented yet");
+	// Step 2: Update the priority
+	proc->priority=priority;
+
+    //Adjust the queues if the environment is ready
+    if (proc->env_status == ENV_READY) {
+        // Remove the environment from its current queue
+        sched_remove_ready(proc);
+
+        // Insert the environment into the correct priority queue
+        sched_insert_ready(proc);
+    }
+
 }
 
 void sched_set_starv_thresh(uint32 starvThresh)
@@ -717,5 +732,7 @@ void sched_set_starv_thresh(uint32 starvThresh)
 	//TODO: [PROJECT'24.MS3 - #06] [3] PRIORITY RR Scheduler - sched_set_starv_thresh
 	//Your code is here
 	//Comment the following line
-	panic("Not implemented yet");
+	//panic("Not implemented yet");
+	
+	starvation_threshold= starvThresh;
 }
