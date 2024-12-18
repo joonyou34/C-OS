@@ -89,6 +89,9 @@ void    sys_enqueue(struct Env_Queue *queue, struct Env *env);
 void    sys_remove_from_queue(struct Env_Queue *queue, struct Env *env);
 void    sys_pushcli();
 void    sys_popcli();
+void    sys_sched();
+struct Env *    sys_get_cpu_proc(void);
+
 //Sharing
 //2017
 int 	sys_createSharedObject(char* shareName, uint32 size, uint8 isWritable, void* virtual_address);

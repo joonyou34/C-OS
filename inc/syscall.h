@@ -57,6 +57,10 @@ enum
 	SYS_remove_from_queue,
 	SYS_pushcli,
 	SYS_popcli,
+	SYS_sleep,
+	SYS_wakeup_one,
+	SYS_get_cpu_proc,
+	SYS_sched,
 	//=====================================================================
 	NSYSCALLS
 };

@@ -366,6 +366,16 @@ void sys_remove_from_queue(struct Env_Queue *queue, struct Env *env)
 	return remove_from_queue(queue, env);
 }
 
+struct Env * sys_get_cpu_proc(void)
+{
+	return get_cpu_proc();
+}
+
+void sys_sched()
+{
+	return sched();
+}
+
 /*******************************/
 /* SHARED MEMORY SYSTEM CALLS */
 /*******************************/
@@ -703,6 +713,13 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 
 	case SYS_remove_from_queue:
 		sys_remove_from_queue((struct Env_Queue *)a1, (struct Env *)a2);
+		return 0;
+
+	case SYS_get_cpu_proc:
+		return (uint32)sys_get_cpu_proc();
+
+	case SYS_sched:
+		sys_sched();
 		return 0;
 
 	case NSYSCALLS:

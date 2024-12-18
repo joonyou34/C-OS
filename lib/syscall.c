@@ -332,3 +332,13 @@ void sys_popcli()
 {
 	syscall(SYS_popcli, 0, 0 , 0, 0, 0);
 }
+
+struct Env * sys_get_cpu_proc()
+{
+	return (void *)syscall(SYS_get_cpu_proc, 0, 0, 0, 0, 0);
+}
+
+void sys_sched()
+{
+	syscall(SYS_sched, 0, 0, 0, 0, 0);
+}
