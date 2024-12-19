@@ -369,20 +369,24 @@ struct Env* fos_scheduler_PRIRR()
 	struct Env *curenv = get_cpu_proc();
 
     if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
-        curenv->env_status = ENV_READY; // Mark current environment as READY
-        sched_insert_ready(curenv);    // Reinsert it into the appropriate ready queue
+        curenv->env_status = ENV_READY; // Mark environment as READY
+        sched_insert_ready(curenv);    // Reinsert in ready queue
     }
 
-    // Step 2: Select the next environment to run
     struct Env* next_env = NULL;
 
-    for (int priority = PRIORITY_HIGH; priority >= PRIORITY_LOW; priority--) {
-        if (!LIST_EMPTY(&ProcessQueues.env_ready_queues[priority])) {
-            next_env = LIST_FIRST(&ProcessQueues.env_ready_queues[priority]); 
-            sched_remove_ready(next_env);                              
-            break;                                                   
-        }
-    }
+    // for (int priority = PRIORITY_HIGH; priority >= PRIORITY_LOW; priority--) {
+    //     if (!LIST_EMPTY(&ProcessQueues.env_ready_queues[priority])) {
+    //         next_env = LIST_FIRST(&ProcessQueues.env_ready_queues[priority]); 
+    //         sched_remove_ready(next_env);                              
+    //         break;                                                   
+    //     }
+    // }
+
+	//keda foo2 wala ely ta7t
+
+	next_env=dequeue(&(ProcessQueues.env_ready_queues[0]));
+	//sched_remove_ready(next_env);
 
     // law mafeesh environments 23mel eh
     // if (next_env == NULL) {
