@@ -261,9 +261,12 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	kclock_set_quantum(quantum);
 
 	num_of_ready_queues = numOfPriorities;
+	ProcessQueues.env_ready_queues = (struct Env_Queue*)kmalloc(sizeof(Env_Queue)*num_of_ready_queues);
+	if(ProcessQueues.env_ready_queues == NULL)
+		panic("no memory available");
 	struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues;
 	while(numOfPriorities--){
-		init_queue(ProcessQueues.env_ready_queues);
+		init_queue(curr_queue);
 		curr_queue++;
 	}
 	
@@ -281,7 +284,6 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	//=========================================
 	//=========================================
 }
-
 //=========================
 // [7] RR Scheduler:
 //=========================
