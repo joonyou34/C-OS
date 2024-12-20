@@ -359,7 +359,6 @@ void sys_init_queue(struct Env_Queue *queue)
 void sys_enqueue(struct Env_Queue *queue, struct semaphore *sem)
 {
 	acquire_spinlock(&ProcessQueues.qlock);
-	
 	cur_env->env_status = ENV_BLOCKED;
 	enqueue(queue, cur_env);
 	sem->semdata->lock = 0;
