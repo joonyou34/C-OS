@@ -363,7 +363,53 @@ struct Env* fos_scheduler_PRIRR()
 	//TODO: [PROJECT'24.MS3 - #08] [3] PRIORITY RR Scheduler - fos_scheduler_PRIRR
 	//Your code is here
 	//Comment the following line
-	panic("Not implemented yet");
+	//panic("Not implemented yet");
+	
+	acquire_spinlock(&ProcessQueues.qlock);
+	struct Env *curenv = get_cpu_proc();
+
+    if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
+        curenv->env_status = ENV_READY; // Mark environment as READY
+        sched_insert_ready(curenv);    // Reinsert in ready queue
+    }
+
+    struct Env* next_env = NULL;
+
+    // for (int priority = PRIORITY_HIGH; priority >= PRIORITY_LOW; priority--) {
+    //     if (!LIST_EMPTY(&ProcessQueues.env_ready_queues[priority])) {
+    //         next_env = LIST_FIRST(&ProcessQueues.env_ready_queues[priority]); 
+    //         sched_remove_ready(next_env);                              
+    //         break;                                                   
+    //     }
+    // }
+
+	//keda foo2 wala ely ta7t
+
+	next_env=dequeue(&(ProcessQueues.env_ready_queues[0]));
+	//sched_remove_ready(next_env);
+
+    // law mafeesh environments 23mel eh
+    // if (next_env == NULL) {
+	// 	release_spinlock(&ProcessQueues.qlock);
+
+	// 	cprintf("Scheduler: No ready processes. CPU is idle");
+
+    //     // Optionally halt the CPU
+    //     asm volatile("hlt");
+
+    //     return NULL ;
+    // }
+
+	//set el quantum i guess heya de el function
+    //kclock_set_quantum(quantums[next_env->priority]);
+	//wala keda
+	kclock_set_quantum(quantums[0]);
+
+    next_env->env_status = ENV_RUNNING;
+
+	release_spinlock(&ProcessQueues.qlock);
+
+    return next_env;
 }
 
 //========================================

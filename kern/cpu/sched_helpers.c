@@ -713,18 +713,19 @@ void env_set_priority(int envID, int priority)
 	//Your code is here
 	//Comment the following line
 	//panic("Not implemented yet");
-	// Step 2: Update the priority
 	proc->priority=priority;
 
-    //Adjust the queues if the environment is ready
+	acquire_spinlock(&ProcessQueues.qlock);
+
+    
     if (proc->env_status == ENV_READY) {
-        // Remove the environment from its current queue
+        // Remove from its current queue
         sched_remove_ready(proc);
 
-        // Insert the environment into the correct priority queue
+        // Insert into priority queue
         sched_insert_ready(proc);
     }
-
+	release_spinlock(&ProcessQueues.qlock);
 }
 
 void sched_set_starv_thresh(uint32 starvThresh)
