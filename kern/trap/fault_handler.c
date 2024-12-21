@@ -391,18 +391,23 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 			// }
 			//setPageReplacmentAlgorithmNchanceCLOCK(1);
 
+			// Bonus
 			int N_ = page_WS_max_sweeps;
 			int N_mod = N_;
-			//cprintf("N: %d \n",N_);
+			// cprintf("N: %d \n",N_);
 			if(N_<0){
 				N_ = N_*-1;
 				N_mod = N_ + 1;
 			}
 			
-			int to_brk = 1;
-			// int threshold_loop = 100000000;
-			while(to_brk){
-				// cprintf("HERE");
+			//struct WorkingSetElement *ans = faulted_env->page_last_WS_element;
+			unsigned int ans_va = 1;
+
+			int mn_rem = 1000000000;
+			uint32 looper = LIST_SIZE(&faulted_env->page_WS_list);
+			
+			while(looper>0){
+				looper--;
 				uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
 				
 				// if used, then make it unused and reset the sweeps and move next
@@ -411,9 +416,21 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 					// cprintf("used: ");
 					// cprintf("%d",faulted_env->page_last_WS_element->sweeps_counter);
 					// cprintf("\n");
-					pt_set_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address,perms,PERM_USED);
-					faulted_env->page_last_WS_element->sweeps_counter = 0;
-
+					//pt_set_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address,perms,PERM_USED);
+					//faulted_env->page_last_WS_element->sweeps_counter = 0;
+					if((perms&PERM_MODIFIED) == PERM_MODIFIED){ // use N_mod
+						int rem = N_mod +1;
+						if(rem<mn_rem){
+							mn_rem = rem;
+							ans_va = faulted_env->page_last_WS_element->virtual_address;
+						}
+					}else{
+						int rem = N_ +1;
+						if(rem<mn_rem){
+							mn_rem = rem;
+							ans_va = faulted_env->page_last_WS_element->virtual_address;
+						}
+					}
 					// move pointer in cycle
 					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
 					{
@@ -430,58 +447,167 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 
 
 				if((perms&PERM_MODIFIED) == PERM_MODIFIED){ // use N_mod
-					if(faulted_env->page_last_WS_element->sweeps_counter >= N_mod){ // replace it
-						uint32 *ptr_page_table = NULL;
-						int FLAG = get_page_table(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
-						if(FLAG == TABLE_NOT_EXIST){
-							panic("Table not exist,(page fault handler)\n");
-							return;
-						}
-						struct FrameInfo* ptr_frame_info = get_frame_info(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
-						
-						// may be a FOS error here, the fos function should return but in the implementation it dont
-						pf_update_env_page(faulted_env,faulted_env->page_last_WS_element->virtual_address,ptr_frame_info);
+					//faulted_env->page_last_WS_element->sweeps_counter++;
 
-						unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
-						// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
-						break;
-					}else{
-						faulted_env->page_last_WS_element->sweeps_counter++;
-						// move pointer in cycle
-						if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
-						{
-							faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
-						}
-						else
-						{
-							faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
-						}
-						continue;
+					int rem = N_mod - (int)faulted_env->page_last_WS_element->sweeps_counter;
+					if(rem<mn_rem){
+						mn_rem = rem;
+						ans_va = faulted_env->page_last_WS_element->virtual_address;
+					}	
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
 					}
+					else
+					{
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					
 				}else{
-					if(faulted_env->page_last_WS_element->sweeps_counter >= N_){ // replace it
-						unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
-						// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
-						break;
-					}else{
-						faulted_env->page_last_WS_element->sweeps_counter++;
-						// move pointer in cycle
-						if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
-						{
-							faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
-						}
-						else
-						{
-							faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
-						}
-						continue;
+					//faulted_env->page_last_WS_element->sweeps_counter++;
+
+					int rem = N_ - (int)faulted_env->page_last_WS_element->sweeps_counter;
+					if(rem<mn_rem){
+						mn_rem = rem;
+						ans_va = faulted_env->page_last_WS_element->virtual_address;
+					}	
+					//faulted_env->page_last_WS_element->sweeps_counter++;
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
 					}
+					else
+					{
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					
+				}
+			}
+			
+			looper = LIST_SIZE(&faulted_env->page_WS_list);
+			// int threshold_loop = 100000000;
+			int after = 0;
+			while(looper > 0){
+				looper--;
+				if(faulted_env->page_last_WS_element->virtual_address == ans_va){
+					after = 1;
+				}
+				//if(laster == faulted_env->page_WS_list)
+				// cprintf("HERE");
+				uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+				
+				// if used, then make it unused and reset the sweeps and move next
+				if((perms&PERM_USED) == PERM_USED){
+					// used page, so start
+					// cprintf("used: ");
+					// cprintf("%d",faulted_env->page_last_WS_element->sweeps_counter);
+					// cprintf("\n");
+					if(mn_rem - after>0){
+						pt_set_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address,perms,PERM_USED);
+						faulted_env->page_last_WS_element->sweeps_counter = mn_rem-after-1; 
+					}
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+						//cprintf("move First\n");
+					}
+					else
+					{
+						//cprintf("move Next\n");
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					continue;
+				}
+
+
+				if((perms&PERM_MODIFIED) == PERM_MODIFIED){ // use N_mod
+					faulted_env->page_last_WS_element->sweeps_counter+=(mn_rem-after);
+
+					// -1 5 5 3 4 --> 7 --> rem = 2
+					// 0 6 6 4 5
+					// 1 7 6 4 5
+					// 5 6 6 4 5
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+					}
+					else
+					{
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					
+				}else{
+					faulted_env->page_last_WS_element->sweeps_counter+=(mn_rem-after);
+
+					//faulted_env->page_last_WS_element->sweeps_counter++;
+					// move pointer in cycle
+					if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					{
+						faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+					}
+					else
+					{
+						faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					}
+					// if(faulted_env->page_last_WS_element->sweeps_counter >= N_){ // replace it
+					// 	unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+					// 	// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
+					// 	break;
+					// }else{
+					// 	faulted_env->page_last_WS_element->sweeps_counter++;
+					// 	// move pointer in cycle
+					// 	if(faulted_env->page_last_WS_element == LIST_LAST(&faulted_env->page_WS_list))
+					// 	{
+					// 		faulted_env->page_last_WS_element = LIST_FIRST(&faulted_env->page_WS_list);
+					// 	}
+					// 	else
+					// 	{
+					// 		faulted_env->page_last_WS_element = faulted_env->page_last_WS_element->prev_next_info.le_next;
+					// 	}
+					// 	continue;
+					// }
 				}
 			}
 
 			//cprintf ("lst: %d\n",faulted_env->page_last_WS_element->virtual_address);
 			
 			//page_fault_handler(faulted_env,fault_va);
+			
+			//get object to remove
+			
+			struct WorkingSetElement *ele;
+			LIST_FOREACH(ele,&faulted_env->page_WS_list){
+				if(ele->virtual_address==ans_va)
+				{
+					faulted_env->page_last_WS_element = ele;break;
+				}
+			} 
+			// 5 7 7 2 2 --> to 8
+			// 6 8 8 3 3
+			uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+			if((perms&PERM_MODIFIED) == PERM_MODIFIED){ 
+
+				uint32 *ptr_page_table = NULL;
+				int FLAG = get_page_table(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
+				if(FLAG == TABLE_NOT_EXIST){
+					panic("Table not exist,(page fault handler)\n");
+					return;
+				}
+				struct FrameInfo* ptr_frame_info = get_frame_info(faulted_env->env_page_directory, faulted_env->page_last_WS_element->virtual_address, &ptr_page_table);
+				
+				// may be a FOS error here, the fos function should return but in the implementation it dont
+				pf_update_env_page(faulted_env,faulted_env->page_last_WS_element->virtual_address,ptr_frame_info);
+
+				unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+				// env_page_ws_invalidate(faulted_env,faulted_env->page_last_WS_element->virtual_address);
+			}else{
+				unmap_frame(faulted_env->env_page_directory,faulted_env->page_last_WS_element->virtual_address);
+
+			}
 			
 			{// place it
 				struct FrameInfo *frame = NULL;
@@ -566,7 +692,7 @@ void page_fault_handler(struct Env *faulted_env, uint32 fault_va)
 					env_exit();
 				}
 			}
-			cprintf("HERE\n");
+			// cprintf("HERE\n");
 
 			// Update the working set
 			struct WorkingSetElement* NEW_ELEMENTY = env_page_ws_list_create_element(faulted_env, fault_va);
