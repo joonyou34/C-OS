@@ -392,6 +392,10 @@ void sys_sched_insert_ready(struct Env* env)
 	return sched_insert_ready(env);
 }
 
+void sys_env_set_priority(int32 envID, int priority){
+	env_set_priority(envID,priority);
+}
+
 /*******************************/
 /* SHARED MEMORY SYSTEM CALLS */
 /*******************************/
@@ -742,10 +746,14 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 	case SYS_sched_insert_ready:
 		sys_sched_insert_ready((struct Env *) a1);
 		return 0;
+	case SYS_env_set_priority:
+		sys_env_set_priority((uint32) a1 , (int)a2 );
+		return 0;
 
 	case NSYSCALLS:
 		return -E_INVAL;
 		break;
+	
 	}
 	// panic("syscall not implemented");
 	return -E_INVAL;

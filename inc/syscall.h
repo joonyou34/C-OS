@@ -62,6 +62,7 @@ enum
 	SYS_get_cpu_proc,
 	SYS_sched,
 	SYS_sched_insert_ready,
+	SYS_env_set_priority,
 	//=====================================================================
 	NSYSCALLS
 };
