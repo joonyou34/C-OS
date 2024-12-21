@@ -227,7 +227,6 @@ void *smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 					freeList[i] = freeList[i+1];
 				}
 			}
-			cprintf("try to insert in tail\n");
 
 			struct FreeShareMapping fsm  ;
 			//cprintf("return id %x\n",returnid);
