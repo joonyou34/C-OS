@@ -9,6 +9,7 @@
 uint32 physToVirt[0xFFFFF000 / 4096];
 uint32 lstAddr = 0;
 uint32 lstPageCt = -1;
+struct spinlock klock;
 
 // Initialize the dynamic allocator of kernel heap with the given start address, size & limit
 // All pages in the given range should be allocated
@@ -21,7 +22,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	// TODO: [PROJECT'24.MS2 - #01] [1] KERNEL HEAP - initialize_kheap_dynamic_allocator
 	//  Write your code here, remove the panic and write your code
 	// panic("initialize_kheap_dynamic_allocator() is not implemented yet...!!");
-
 	start = (uint32 *)ROUNDDOWN(daStart, PAGE_SIZE);
 	brk = (uint32 *)ROUNDUP((uint32)((char *)start + initSizeToAllocate), PAGE_SIZE);
 	limit = (uint32 *)ROUNDUP(daLimit, PAGE_SIZE);
@@ -41,6 +41,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		struct FrameInfo *ptr_frame_info = get_frame_info(ptr_page_directory, i, &ptr);
 
 		int ret = allocate_frame(&ptr_frame_info);
+
 		if (ret == E_NO_MEM)
 		{
 			panic("No Memory available");
@@ -50,7 +51,9 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		ret = map_frame(ptr_page_directory, ptr_frame_info, i, PERM_WRITEABLE); // adjust perms
 
 		if (ret == E_NO_MEM)
+		{
 			panic("No Memory for page table");
+		}
 		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
 		physToVirt[frameNum] = i;
 	}
@@ -79,11 +82,16 @@ void *sbrk(int numOfPages)
 	//  panic("sbrk() is not implemented yet...!!");
 
 	if (!numOfPages)
+	{
 		return brk;
+	}
 	uint32 numBytes = numOfPages * PAGE_SIZE;
+	
 	uint32 *finish = (uint32 *)(((char *)brk) + numBytes);
 	if (finish > limit)
+	{
 		return (void *)-1;
+	}
 
 	for (uint32 va = (uint32)brk; (uint32 *)va < finish; va += PAGE_SIZE)
 	{
@@ -92,7 +100,9 @@ void *sbrk(int numOfPages)
 
 		int ret = allocate_frame(&ptr_frame_info);
 		if (ret == E_NO_MEM)
+		{
 			return (void *)-1;
+		}
 
 		ret = map_frame(ptr_page_directory, ptr_frame_info, va, PERM_WRITEABLE);
 		uint32 frameNum = to_physical_address(ptr_frame_info) / PAGE_SIZE;
@@ -110,21 +120,22 @@ void *kmalloc(unsigned int size)
 	// TODO: [PROJECT'24.MS2 - #03] [1] KERNEL HEAP - kmalloc
 	//  Write your code here, remove the panic and write your code
 	// kpanic_into_prompt("kmalloc() is not implemented yet...!!");
-
 	if (size == 0 || size > (KERNEL_HEAP_MAX - ((uint32)limit + PAGE_SIZE)))
 	{
 		return NULL;
 	}
 	if (size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 	{
+		acquire_spinlock(&klock);
 		void *ptr = alloc_block_FF(size);
 		if ((uint32)ptr < KERNEL_HEAP_START || (uint32)ptr >= KERNEL_HEAP_START + DYN_ALLOC_MAX_SIZE)
 			cprintf("address out of bounds for block allocator\n");
+    	release_spinlock(&klock);
 		return ptr;
 	}
 	else
 	{
-
+		acquire_spinlock(&klock);
 		uint32 numOfPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 		if(numOfPages < lstPageCt) {
 			lstPageCt = numOfPages;
@@ -134,6 +145,7 @@ void *kmalloc(unsigned int size)
 		uint32 pgAllocEndArea = KERNEL_HEAP_MAX;
 		uint32 pagesFound = 0, firstPageAddr = 0;
 
+		
 		// get the first Page Address
 		for (uint32 addr = pgAllocStartArea; addr < pgAllocEndArea; addr += PAGE_SIZE)
 		{
@@ -155,7 +167,10 @@ void *kmalloc(unsigned int size)
 		}
 
 		if (pagesFound < numOfPages)
+		{
+    		release_spinlock(&klock);
 			return NULL;
+		}
 
 		for (uint32 addr = firstPageAddr; addr < (firstPageAddr + numOfPages * PAGE_SIZE); addr += PAGE_SIZE)
 		{
@@ -167,6 +182,8 @@ void *kmalloc(unsigned int size)
 				{
 					unmap_frame(ptr_page_directory, rollback_addr);
 				}
+
+   				release_spinlock(&klock);
 				return NULL;
 			}
 			uint32 frameNum = to_physical_address(frame_info) / PAGE_SIZE;
@@ -178,13 +195,14 @@ void *kmalloc(unsigned int size)
 				uint32 *table;
 				get_page_table(ptr_page_directory, addr, &table);
 
-#define LAST_PAGE 512 // 9TH bit (set when it is the end page in allocation)
+				#define LAST_PAGE 512 // 9TH bit (set when it is the end page in allocation)
 				table[PTX(addr)] |= LAST_PAGE;
 				lstAddr = addr + PAGE_SIZE;
 				lstPageCt = numOfPages;
 			}
 		}
 
+    	release_spinlock(&klock);
 		return (void *)firstPageAddr;
 	}
 }
@@ -202,17 +220,17 @@ void kfree(void *virtual_address)
 	{
 		panic("Invalid address to free, outside kernel heap bounds");
 	}
-
+	acquire_spinlock(&klock);
 	if ((uint32)virtual_address < (uint32)limit)
 	{
 
 		if ((uint32)virtual_address < (uint32)brk)
 			free_block(virtual_address);
-
+		release_spinlock(&klock);
 		return;
 	}
 	uint32 st = ROUNDDOWN((uint32)virtual_address, PAGE_SIZE);
-
+	
 	for (uint32 addr = st;; addr += PAGE_SIZE)
 	{
 		uint32 *table;
@@ -221,6 +239,7 @@ void kfree(void *virtual_address)
 		if (ptr_frame_info == NULL)
 		{
 			lstPageCt = -1;
+
 			panic("Cannot free an already freed page");
 		}
 
@@ -240,9 +259,9 @@ void kfree(void *virtual_address)
 		unmap_frame(ptr_page_directory, addr);
 	}
 
-
 	if(st < lstAddr)
 		lstPageCt = -1;
+	release_spinlock(&klock);
 }
 
 unsigned int kheap_physical_address(unsigned int virtual_address)
@@ -250,16 +269,24 @@ unsigned int kheap_physical_address(unsigned int virtual_address)
 	// TODO: [PROJECT'24.MS2 - #05] [1] KERNEL HEAP - kheap_physical_address
 	//  Write your code here, remove the panic and write your code
 	// panic("kheap_physical_address() is not implemented yet...!!");
+	acquire_spinlock(&klock);
 	uint32 offset = PGOFF(virtual_address);
 	uint32 *pgTablePtr = NULL;
 	get_page_table(ptr_page_directory, virtual_address, &pgTablePtr);
 	if (pgTablePtr == NULL)
+	{
+		release_spinlock(&klock);
 		return 0;
+	}
 	uint32 pgTableEntry = pgTablePtr[PTX(virtual_address)];
 	if (!(pgTableEntry & PERM_PRESENT))
+	{
+		release_spinlock(&klock);
 		return 0;
+	}
 	uint32 frameNum = pgTableEntry >> 12;
 	uint32 pa = frameNum * PAGE_SIZE + offset;
+	release_spinlock(&klock);
 	return pa;
 	// get corresponding frame number
 	// return the physical address corresponding to given virtual_address
@@ -275,8 +302,9 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	// panic("kheap_virtual_address() is not implemented yet...!!");
 	uint32 frameNum = physical_address / PAGE_SIZE; // Extract frame number
 	uint32 offset = physical_address % PAGE_SIZE;	// Extract offset within the page
+	acquire_spinlock(&klock);
 	uint32 virtualAddressBase = physToVirt[frameNum];
-
+	release_spinlock(&klock);
 	if (virtualAddressBase == 0)
 		return 0;
 
