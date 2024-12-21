@@ -715,6 +715,10 @@ void env_set_priority(int envID, int priority)
 	//panic("Not implemented yet");
 	proc->priority=priority;
 
+	if (holding_spinlock(&ProcessQueues.qlock)){
+        panic("You cannot access the queue");
+    }
+
 	acquire_spinlock(&ProcessQueues.qlock);
 
     
@@ -735,5 +739,5 @@ void sched_set_starv_thresh(uint32 starvThresh)
 	//Comment the following line
 	//panic("Not implemented yet");
 	
-	starvation_threshold= starvThresh;
+	starvation_threshold = starvThresh;
 }

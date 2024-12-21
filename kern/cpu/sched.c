@@ -251,8 +251,7 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	//Comment the following line
 	// panic("Not implemented yet");
 
-
-	if (ProcessQueues.qlock.locked){
+	if (holding_spinlock(&ProcessQueues.qlock)){
         panic("You cannot access the queue");
     }
 
@@ -261,7 +260,7 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	kclock_set_quantum(quantum);
 
 	num_of_ready_queues = numOfPriorities;
-	ProcessQueues.env_ready_queues = (struct Env_Queue*)kmalloc(sizeof(Env_Queue)*num_of_ready_queues);
+	ProcessQueues.env_ready_queues = (struct Env_Queue*)kmalloc(sizeof(struct Env_Queue)*num_of_ready_queues);
 	if(ProcessQueues.env_ready_queues == NULL)
 		panic("no memory available");
 	struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues;
@@ -367,7 +366,6 @@ struct Env* fos_scheduler_PRIRR()
 	//Comment the following line
 	//panic("Not implemented yet");
 	
-	acquire_spinlock(&ProcessQueues.qlock);
 	struct Env *curenv = get_cpu_proc();
 
     if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
@@ -409,7 +407,6 @@ struct Env* fos_scheduler_PRIRR()
 
     next_env->env_status = ENV_RUNNING;
 
-	release_spinlock(&ProcessQueues.qlock);
 
     return next_env;
 }
@@ -427,7 +424,7 @@ void clock_interrupt_handler(struct Trapframe* tf)
 		//Comment the following line
 		// panic("Not implemented yet");
 
-		if (ProcessQueues.qlock.locked){
+		if (holding_spinlock(&ProcessQueues.qlock)){
         	panic("You cannot access the queue");
     	}
 
