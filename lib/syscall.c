@@ -348,7 +348,7 @@ void sys_sched_insert_ready(struct Env* env)
 	syscall(SYS_sched_insert_ready, (uint32)env, 0, 0, 0, 0);
 }
 
-void sys_env_set_priority(uint32 envID, int priority)
+void sys_env_set_priority(int32 envID, int priority)
 {
-	syscall(SYS_env_set_priority, (uint32)envID, (int)priority, 0, 0, 0);
+	syscall(SYS_env_set_priority, envID, priority, 0, 0, 0);
 }

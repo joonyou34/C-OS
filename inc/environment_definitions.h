@@ -126,6 +126,7 @@ struct Env {
 	uint32* brk;
 	uint32* limit;
 
+	uint32 nclock_replacement;
 	//=======================================================================
 	//for page file management
 	uint32* disk_env_pgdir;

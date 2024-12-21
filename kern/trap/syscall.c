@@ -393,7 +393,9 @@ void sys_sched_insert_ready(struct Env* env)
 }
 
 void sys_env_set_priority(int32 envID, int priority){
+	acquire_spinlock(&ProcessQueues.qlock);
 	env_set_priority(envID,priority);
+	release_spinlock(&ProcessQueues.qlock);
 }
 
 /*******************************/
@@ -747,8 +749,9 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		sys_sched_insert_ready((struct Env *) a1);
 		return 0;
 	case SYS_env_set_priority:
-		sys_env_set_priority((uint32) a1 , (int)a2 );
+		sys_env_set_priority(a1 ,a2 );
 		return 0;
+		break;
 
 	case NSYSCALLS:
 		return -E_INVAL;

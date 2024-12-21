@@ -705,22 +705,22 @@ void env_set_priority(int envID, int priority)
 
 	//Get the process of the given ID
 	struct Env* proc ;
-	//envid2env(envID, &proc, 0);
-	if (envid2env(envID, &proc, 0) != 0) {
-        panic("Invalid envID");
-    }
+	envid2env(envID, &proc, 0);
+	// if (envid2env(envID, &proc, 0) != 0) {
+    //     panic("Invalid envID");
+    // }
 
 	//Your code is here
 	//Comment the following line
 	//panic("Not implemented yet");
+	
+
+	// if (holding_spinlock(&ProcessQueues.qlock)){
+    //     panic("You cannot access the queue");
+    // }
+
+	//acquire_spinlock(&ProcessQueues.qlock);
 	proc->priority=priority;
-
-	if (holding_spinlock(&ProcessQueues.qlock)){
-        panic("You cannot access the queue");
-    }
-
-	acquire_spinlock(&ProcessQueues.qlock);
-
     
     if (proc->env_status == ENV_READY) {
         // Remove from its current queue
@@ -729,7 +729,8 @@ void env_set_priority(int envID, int priority)
         // Insert into priority queue
         sched_insert_ready(proc);
     }
-	release_spinlock(&ProcessQueues.qlock);
+
+	//release_spinlock(&ProcessQueues.qlock);
 }
 
 void sched_set_starv_thresh(uint32 starvThresh)

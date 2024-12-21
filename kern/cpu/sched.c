@@ -251,27 +251,39 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 	//Comment the following line
 	// panic("Not implemented yet");
 
+
+	// if (ProcessQueues.qlock.locked){
+    //     panic("You cannot access the queue");
+    // }
 	if (holding_spinlock(&ProcessQueues.qlock)){
         panic("You cannot access the queue");
     }
 
-	acquire_spinlock(&ProcessQueues.qlock);
+	//acquire_spinlock(&ProcessQueues.qlock);
 
-	kclock_set_quantum(quantum);
-
+	
 	num_of_ready_queues = numOfPriorities;
 	ProcessQueues.env_ready_queues = (struct Env_Queue*)kmalloc(sizeof(struct Env_Queue)*num_of_ready_queues);
+
+	quantums=kmalloc(sizeof(uint8));
+	quantums[0]=quantum;
 	if(ProcessQueues.env_ready_queues == NULL)
 		panic("no memory available");
+
 	struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues;
-	while(numOfPriorities--){
-		init_queue(curr_queue);
-		curr_queue++;
-	}
+	// while(numOfPriorities--){
+	// 	init_queue(curr_queue);
+	// 	curr_queue++;
+	// }
+	for(int i = 0; i < num_of_ready_queues; i++)
+    {
+        init_queue(&ProcessQueues.env_ready_queues[i]);
+    }
 	
+	kclock_set_quantum(quantum);
 	sched_set_starv_thresh(starvThresh);
 
-	release_spinlock(&ProcessQueues.qlock);
+	// release_spinlock(&ProcessQueues.qlock);
 
 
 	//=========================================
@@ -366,47 +378,27 @@ struct Env* fos_scheduler_PRIRR()
 	//Comment the following line
 	//panic("Not implemented yet");
 	
+	//acquire_spinlock(&ProcessQueues.qlock);
 	struct Env *curenv = get_cpu_proc();
+    struct Env* next_env = NULL;
 
-    if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
-        curenv->env_status = ENV_READY; // Mark environment as READY
+    if (curenv != NULL) {
+        //curenv->env_status = ENV_READY; // Mark environment as READY
         sched_insert_ready(curenv);    // Reinsert in ready queue
     }
 
-    struct Env* next_env = NULL;
 
-    // for (int priority = PRIORITY_HIGH; priority >= PRIORITY_LOW; priority--) {
-    //     if (!LIST_EMPTY(&ProcessQueues.env_ready_queues[priority])) {
-    //         next_env = LIST_FIRST(&ProcessQueues.env_ready_queues[priority]); 
-    //         sched_remove_ready(next_env);                              
-    //         break;                                                   
-    //     }
-    // }
+    for (int priority = 0; priority < num_of_ready_queues; priority++) {
+        if (queue_size(&(ProcessQueues.env_ready_queues[priority]))) {
+            next_env = dequeue(&ProcessQueues.env_ready_queues[priority]);                                    
+            break;                                                   
+        }
+    }
 
-	//keda foo2 wala ely ta7t
-
-	next_env=dequeue(&(ProcessQueues.env_ready_queues[0]));
-	//sched_remove_ready(next_env);
-
-    // law mafeesh environments 23mel eh
-    // if (next_env == NULL) {
-	// 	release_spinlock(&ProcessQueues.qlock);
-
-	// 	cprintf("Scheduler: No ready processes. CPU is idle");
-
-    //     // Optionally halt the CPU
-    //     asm volatile("hlt");
-
-    //     return NULL ;
-    // }
-
-	//set el quantum i guess heya de el function
-    //kclock_set_quantum(quantums[next_env->priority]);
 	//wala keda
 	kclock_set_quantum(quantums[0]);
 
-    next_env->env_status = ENV_RUNNING;
-
+    //next_env->env_status = ENV_UNKNOWN;
 
     return next_env;
 }
@@ -424,27 +416,51 @@ void clock_interrupt_handler(struct Trapframe* tf)
 		//Comment the following line
 		// panic("Not implemented yet");
 
-		if (holding_spinlock(&ProcessQueues.qlock)){
-        	panic("You cannot access the queue");
-    	}
+		//use the isholding function directly
+		// if(holding_spinlock(&ProcessQueues.qlock)){
+		// 	panic("You cannot access the queue");
+		// }
+		// if (ProcessQueues.qlock.locked){
+        // 	panic("You cannot access the queue");
+    	// }
 
-		acquire_spinlock(&ProcessQueues.qlock);
+		// nclocks -> ticks of the cpu process
+		//7aga 8erha
+		
 
-		for(uint8 i = num_of_ready_queues-1; i ; i--){
-			struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues + i; 
-			uint32 size = queue_size(curr_queue);
-			for(struct Env* proc = (struct Env*)curr_queue; size--; proc++){
-				if(proc->nClocks >= starvation_threshold){
-					proc->nClocks -= starvation_threshold;
-					proc->priority--;
-					remove_from_queue(curr_queue, proc);
-					enqueue(&(ProcessQueues.env_ready_queues[proc->priority]), proc);
+		// for(uint8 i = num_of_ready_queues-1; i ; i--){
+		// 	struct Env_Queue* curr_queue = ProcessQueues.env_ready_queues + i; 
+		// 	uint32 size = queue_size(curr_queue);
+		// 	for(struct Env* proc = (struct Env*)curr_queue; size--; proc++){
+		// 		if(proc->nclock_replacement > starvation_threshold){
+		// 			proc->nclock_replacement -= starvation_threshold;
+		// 			proc->priority--;
+		// 			remove_from_queue(curr_queue, proc);
+		// 			enqueue(&(ProcessQueues.env_ready_queues[proc->priority]), proc);
+		// 			proc->nclock_replacement=0;
+		// 		}else{
+		// 			proc->nclock_replacement++;
+		// 		}
+		// 	}
+		// }
+
+		for(uint8 i=1;i<num_of_ready_queues;i++){
+			struct Env* it;
+			LIST_FOREACH(it,&ProcessQueues.env_ready_queues[i])
+			{
+				if(it->nclock_replacement > starvation_threshold){
+					acquire_spinlock(&ProcessQueues.qlock);
+					env_set_priority(it->env_id,i-1);
+					release_spinlock(&ProcessQueues.qlock);
+					it->nclock_replacement=0;
+				}
+				else{
+					it->nclock_replacement++;
 				}
 			}
 		}
-
-		release_spinlock(&ProcessQueues.qlock);
-
+		sched_print_all();
+	
 	}
 
 
