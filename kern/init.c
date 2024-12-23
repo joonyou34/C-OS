@@ -148,8 +148,8 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 	
 	static uint8* fb;
 	cprintf("* 7) GPU?\n");
+	if(VESA_mode_info != 0)
 	{
-		// cprintf("A1: %x, A2: %x", VESA_mode_info, ((struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE)))->framebuffer);
 		struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
 
 		uint32 sz = mode_info->width * mode_info->height * sizeof(int);

@@ -41,17 +41,6 @@ cmain(struct vbe_mode_info_structure* mode_info)
 {
 	struct Proghdr *ph, *eph;
 
-	// struct vbe_mode_info_structure* VESA_INFO = (struct vbe_mode_info_structure*)(((char*)mode_info + 0));
-
-	// volatile uint32 *fp = (uint32*)(VESA_INFO->framebuffer + 0);
-	// uint32 w = VESA_INFO->width, h = VESA_INFO->height;
-	// uint32* fb = (uint32*)fp;
-	// for(int x = 0; x < w; x++) {
-	// 	for(int y = 0; y < h; y++) {
-	// 		fb[y*w+x]= 0xFFFFFFFF;
-	// 	}
-	// }
-
 	// read 1st page off disk
 	readseg((uint32) ELFHDR, SECTSIZE*8, SECTSIZE);
 	// is this a valid ELF?
