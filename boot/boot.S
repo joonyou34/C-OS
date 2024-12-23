@@ -1,8 +1,3 @@
-#include <inc/mmu.h>
-.set PROT_MODE_CSEG,0x8		# code segment selector
-.set PROT_MODE_DSEG,0x10        # data segment selector
-.set CR0_PE_ON,0x1		# protected mode enable flag
-	
 ###############################################################################
 # ENTRY POINT	
 #   This code should be stored in the first sector of the hard disk.
@@ -29,7 +24,26 @@ start:		.code16				# This runs in real mode
 
 		# Set up the stack pointer, growing downward from 0x7c00.
 		movw	$start,%sp         	# Stack Pointer
-	
+
+		# initiate video mode switch
+		movw	$0x4f02, %ax
+        movw	$0x4118, %bx
+        int	$0x10
+
+		# in case the mode set was successful, spin
+		jc      spin
+		
+		# retrieve mode info for mode 0x118
+		lea     VesaModeInfoBlock, %di  
+		movw    %cs, %ax           
+		movw    %ax, %es           
+		movw    $0x4f01, %ax       
+		movw    $0x0118, %cx       
+		int     $0x10              
+
+		# in case the mode info query was successful, spin
+		jc      spin           
+
 # Enable A20:
 #   For fascinating historical reasons (related to the fact that
 #   the earliest 8086-based PCs could only address 1MB of physical memory
@@ -49,49 +63,64 @@ seta20.2:	inb	$0x64,%al		# Get status
 		movb	$0xdf,%al		# Enable
 		outb	%al,$0x60		#  A20
 
-# Switch from real to protected mode:
-#   Up until now, there's been no protection, so we've gotten along perfectly
-#   well without explicitly telling the processor how to translate addresses.
-#   When we switch to protected mode, this is no longer true!
-#   We need at least to set up some "segments" that tell the processor it's
-#   OK to run code at any address, or write to any address.
-#   The 'gdt' and 'gdtdesc' tables below define these segments.
-#   This code loads them into the processor.
-#   We need this setup to ensure the transition to protected mode is smooth.
+	mov $0x02, %ah
+	mov	$1,	   %al 		  # number of sectors to read
+	mov $0x2, %cl        # Set sector to read (2nd sector)
+	mov $0x00, %ch        # Set cylinder (0)
+	mov $0x00, %dh        # Set head (0, for the first platter)
+	mov $0x80, %dl        # Drive number (0x80 for the first hard disk)
 
-real_to_prot:	cli			# Don't allow interrupts: mandatory,
-					# since we didn't set up an interrupt
-					# descriptor table for handling them
-		lgdt	gdtdesc		# load GDT: mandatory in protected mode
-		movl	%cr0, %eax	# Turn on protected mode
-		orl	$CR0_PE_ON, %eax
-		movl	%eax, %cr0
+	xor %bx, %bx          # Clear BX register (segment = 0)
+	mov %bx, %es
+	mov $0x8000, %bx      # Set memory location (0x8000)
 
-	        # CPU magic: jump to relocation, flush prefetch queue, and
-		# reload %cs.  Has the effect of just jmp to the next
-		# instruction, but simultaneously loads CS with
-		# $PROT_MODE_CSEG.
-		ljmp	$PROT_MODE_CSEG, $protcseg
-	
-		# we've switched to 32-bit protected mode; tell the assembler
-		# to generate code for that mode
-protcseg:	.code32
-		# Set up the protected-mode data segment registers
-		movw	$PROT_MODE_DSEG, %ax	# Our data segment selector
-		movw	%ax, %ds		# -> DS: Data Segment
-		movw	%ax, %es		# -> ES: Extra Segment
-		movw	%ax, %fs		# -> FS
-		movw	%ax, %gs		# -> GS
-		movw	%ax, %ss		# -> SS: Stack Segment
-	
-		call cmain			# finish the boot load from C.
-						# cmain() should not return
-spin:		jmp spin			# ..but in case it does, spin
-	
-		.p2align 2			# force 4 byte alignment
-gdt:		SEG_NULL				# null seg
-		SEG(STA_X|STA_R, 0x0, 0xffffffff)	# code seg
-		SEG(STA_W, 0x0, 0xffffffff)	        # data seg
-	
-gdtdesc:	.word	0x17			# sizeof(gdt) - 1
-		.long	gdt			# address gdt
+	int $0x13             # BIOS interrupt to read the disk
+
+	jc spin
+
+	lea     VesaModeInfoBlock, %eax    # Load the address of Mode Info Block
+
+	jmp 0x8000
+
+spin:
+	jmp spin
+
+# the mode info block struct, reference: https://wiki.osdev.org/VESA_Video_Modes
+.align 4
+VesaModeInfoBlock:
+    ModeAttributes:        .space 2         
+    FirstWindowAttributes: .space 1         
+    SecondWindowAttributes:.space 1         
+    WindowGranularity:     .space 2         
+    WindowSize:            .space 2         
+    FirstWindowSegment:    .space 2         
+    SecondWindowSegment:   .space 2         
+    WindowFunctionPtr:     .space 4         
+    BytesPerScanLine:      .space 2         
+
+    Width:                 .space 2         
+    Height:                .space 2         
+    CharWidth:             .space 1         
+    CharHeight:            .space 1         
+    PlanesCount:           .space 1         
+    BitsPerPixel:          .space 1         
+    BanksCount:            .space 1         
+    MemoryModel:           .space 1         
+    BankSize:              .space 1         
+    ImagePagesCount:       .space 1         
+    Reserved1:             .space 1         
+
+    RedMaskSize:           .space 1         
+    RedFieldPosition:      .space 1         
+    GreenMaskSize:         .space 1         
+    GreenFieldPosition:    .space 1         
+    BlueMaskSize:          .space 1         
+    BlueFieldPosition:     .space 1         
+    ReservedMaskSize:      .space 1         
+    ReservedMaskPosition:  .space 1         
+    DirectColorModeInfo:   .space 1         
+
+    LFBAddress:            .space 4         
+    OffscreenMemoryOffset: .space 4         
+    OffscreenMemorySize:   .space 2         
+    Reserved2:             .space 206 

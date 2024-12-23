@@ -7,7 +7,11 @@
 
 OBJDIRS += boot
 
-BOOT_OBJS := $(OBJDIR)/boot/boot.o $(OBJDIR)/boot/main.o
+# notice that we no longer want the main object to be linked with boot
+# but rather with stage 2
+# cause now stage 2 is the one that switches to protected mode
+BOOT_OBJS := $(OBJDIR)/boot/boot.o
+STAGE2_OBJS := $(OBJDIR)/boot/stage2.o $(OBJDIR)/boot/main.o
 
 $(OBJDIR)/boot/%.o: boot/%.c
 	@echo + cc -Os $<
@@ -30,3 +34,9 @@ $(OBJDIR)/boot/boot: $(BOOT_OBJS)
 	$(V)$(OBJCOPY) -S -R ".eh_frame" -O binary $@.out $@
 	$(V)perl boot/sign.pl $(OBJDIR)/boot/boot
 
+# this is supposed to link stage2 and the main c file together and ensures the start at 0x8000 address
+$(OBJDIR)/boot/stage2: $(STAGE2_OBJS)
+	@echo + ld -m elf_i386 boot/stage2
+	$(V)$(LD) --oformat=elf32-i386 -melf_i386 -N -e start2 -Ttext 0x8000 -o $@.out $^
+	$(V)$(OBJDUMP) -S $@.out >$@.asm
+	$(V)$(OBJCOPY) -S -R ".eh_frame" -O binary $@.out $@

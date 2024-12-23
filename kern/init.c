@@ -27,6 +27,8 @@
 #include <kern/tests/test_commands.h>
 #include <kern/disk/pagefile_manager.h>
 
+#include <inc/vesa_info.h>
+
 extern int sys_calculate_free_frames();
 
 //Functions Declaration
@@ -36,7 +38,7 @@ void print_welcome_message();
 
 //First ever function called in FOS kernel
 bool autograde ;
-void FOS_initialize()
+void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 {
 	
 	//get actual addresses after code linking
@@ -144,6 +146,60 @@ void FOS_initialize()
 		uint32 new_sp = KERN_STACK_TOP - sp_offset;
 		write_esp(new_sp);
 		cprintf("*	old SP = %x - updated SP = %x\n", old_sp, read_esp());
+	}
+
+	
+	static uint8* fb;
+	cprintf("* 7) GPU?\n");
+	{
+		// cprintf("A1: %x, A2: %x", VESA_mode_info, ((struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE)))->framebuffer);
+		struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
+
+		uint32 sz = mode_info->width * mode_info->height * sizeof(int);
+		uint32 lim = mode_info->framebuffer+sz;
+		uint32 page_it = 0xef000000;
+		uint32 *ptr_page_table;
+
+		uint32 page_directory_entry = ptr_page_directory[PDX(page_it)];
+
+		if ((page_directory_entry & PERM_PRESENT) == PERM_PRESENT)
+			ptr_page_table = (void*)kheap_virtual_address(EXTRACT_ADDRESS(page_directory_entry));
+		else {
+			ptr_page_table = kmalloc(PAGE_SIZE);
+			ptr_page_directory[PDX(page_it)] = CONSTRUCT_ENTRY(
+				kheap_physical_address((unsigned int)ptr_page_table)
+				, PERM_PRESENT | PERM_USER | PERM_WRITEABLE);
+
+			//================
+			memset(ptr_page_table, 0, PAGE_SIZE);
+			tlbflush();
+		}
+
+		for(uint32 pa = mode_info->framebuffer; pa < lim; pa += PAGE_SIZE) {
+			uint32 pte_available_bits = ptr_page_table[PTX(page_it)] & PERM_AVAILABLE;
+			ptr_page_table[PTX(page_it)] = CONSTRUCT_ENTRY(pa, pte_available_bits | PERM_WRITEABLE | PERM_PRESENT);
+			
+			page_it += PAGE_SIZE;
+		}
+
+		uint32 w = mode_info->width, h = mode_info->height;
+		fb = (uint8*)0xef000000;
+		for(int y = 0; y < h; y++) {
+			for(int x = 0; x < w; x++) {
+				uint32 idx = (y*w+x)*3;
+				fb[idx] = (x*255)/w;			//blue
+				fb[idx+1] = ((x*255)/w)/2;		//green
+				fb[idx+2] = ((w-x-1)*255)/w;	//red
+			}
+		}
+		// #define FRAME_BUFF 0xA0000
+		// volatile uint8 *fp = (uint8*)(KERNEL_BASE + FRAME_BUFF);
+		// fb = (uint8*)fp;
+		// for(int x = 0; x < 320; x++) {
+		// 	for(int y = 0; y < 200; y++) {
+		// 		fb[y*320+x]= x&255;
+		// 	}
+		// }
 	}
 	cprintf("********************************************************************\n");
 
