@@ -1,11 +1,10 @@
 #include "gpu.h"
+#include <inc/uheap.h>
+#include <inc/string.h>
 
-void draw_pixel(uint8 *fb, uint32 width, uint32 height, uint32 x, uint32 y, uint32 r, uint32 g, uint32 b)
+void render_window(struct window* windowbuffer)
 {
-    if (x >= width || y >= height)
-        return;
-    uint32 idx = (y * width + x) * 3;
-    fb[idx] = r;
-    fb[idx + 1] = g;
-    fb[idx + 2] = b;
+    acquire_spinlock(&GPU.lock);
+    memcpy(&GPU.framebuffer, windowbuffer->buffer, sizeof(windowbuffer->buffer));
+    release_spinlock(&GPU.lock);
 }

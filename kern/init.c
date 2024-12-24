@@ -27,7 +27,7 @@
 #include <kern/tests/test_commands.h>
 #include <kern/disk/pagefile_manager.h>
 #include <kern/gpu/gpu.h>
-
+#include <inc/uwindow.h>
 extern int sys_calculate_free_frames();
 
 // Functions Declaration
@@ -169,13 +169,23 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 			cur_page += PAGE_SIZE;
 		}
 
+		// INITIALIZE THE GPU
+		GPU.vbe_mode = VESA_mode_info;
+		GPU.framebuffer = *frame_buffer;
+		init_spinlock(&GPU.lock, "framesuffer");
+
 		uint32 w = mode_info->width, h = mode_info->height;
 
 		for (int y = 0; y < h; y++)
 		{
 			for (int x = 0; x < w; x++)
 			{
-				draw_pixel(frame_buffer, w, h, x, y, (x * 255) / w, ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
+				// draw_pixel(frame_buffer, w, h, x, y, , ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
+
+				uint32 idx = (y * w + x) * 3;
+				frame_buffer[idx] = (x * 255) / w;
+				frame_buffer[idx + 1] = (x * 255) / w;
+				frame_buffer[idx + 2] = (x * 255) / w;
 			}
 		}
 	}

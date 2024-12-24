@@ -352,3 +352,8 @@ void sys_env_set_priority(int32 envID, int priority)
 {
 	syscall(SYS_env_set_priority, envID, priority, 0, 0, 0);
 }
+
+void sys_render_window(struct window *win)
+{
+	syscall(SYS_render_window, (uint32)win, 0, 0, 0, 0);
+}

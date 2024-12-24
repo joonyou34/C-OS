@@ -5,6 +5,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 #include <inc/semaphore.h>
+#include <kern/gpu/gpu.h>
 
 #include <kern/proc/user_environment.h>
 #include "trap.h"
@@ -348,6 +349,15 @@ void sys_set_uheap_strategy(uint32 heapStrategy)
 }
 
 /*******************************/
+/* GRAPHICS SYSTEM CALLS */
+/*******************************/
+
+void sys_render_window(struct window *win)
+{
+	return render_window(win);
+}
+
+/*******************************/
 /* SEMAPHORES SYSTEM CALLS */
 /*******************************/
 //[PROJECT'24.MS3] ADD SUITABLE CODE HERE
@@ -371,13 +381,13 @@ void sys_dequeue(struct Env_Queue *queue)
 {
 
 	acquire_spinlock(&ProcessQueues.qlock);
-	struct Env * e = dequeue(queue);
+	struct Env *e = dequeue(queue);
 	sched_insert_ready(e);
 	release_spinlock(&ProcessQueues.qlock);
 	return;
 }
 
-struct Env * sys_get_cpu_proc(void)
+struct Env *sys_get_cpu_proc(void)
 {
 	return get_cpu_proc();
 }
@@ -387,14 +397,15 @@ void sys_sched()
 	return sched();
 }
 
-void sys_sched_insert_ready(struct Env* env)
+void sys_sched_insert_ready(struct Env *env)
 {
 	return sched_insert_ready(env);
 }
 
-void sys_env_set_priority(int32 envID, int priority){
+void sys_env_set_priority(int32 envID, int priority)
+{
 	acquire_spinlock(&ProcessQueues.qlock);
-	env_set_priority(envID,priority);
+	env_set_priority(envID, priority);
 	release_spinlock(&ProcessQueues.qlock);
 }
 
@@ -730,13 +741,13 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		return 0;
 
 	case SYS_enqueue:
-		sys_enqueue((struct Env_Queue *)a1, (struct semaphore *) a2);
+		sys_enqueue((struct Env_Queue *)a1, (struct semaphore *)a2);
 		return 0;
 
 	case SYS_dequeue:
-		
+
 		sys_dequeue((struct Env_Queue *)a1);
-		return 0; 
+		return 0;
 
 	case SYS_get_cpu_proc:
 		return (uint32)sys_get_cpu_proc();
@@ -746,17 +757,20 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		return 0;
 
 	case SYS_sched_insert_ready:
-		sys_sched_insert_ready((struct Env *) a1);
+		sys_sched_insert_ready((struct Env *)a1);
 		return 0;
 	case SYS_env_set_priority:
-		sys_env_set_priority(a1 ,a2 );
+		sys_env_set_priority(a1, a2);
+		return 0;
+		break;
+	case SYS_render_window:
+		sys_render_window((struct window *)a1);
 		return 0;
 		break;
 
 	case NSYSCALLS:
 		return -E_INVAL;
 		break;
-	
 	}
 	// panic("syscall not implemented");
 	return -E_INVAL;

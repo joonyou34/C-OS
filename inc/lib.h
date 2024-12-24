@@ -20,6 +20,7 @@
 #include <inc/syscall.h>
 #include <inc/uheap.h>
 #include <inc/dynamic_allocator.h>
+#include <inc/uwindow.h>
 
 #define USED(x)		(void)(x)
 #define RAND(s,e)	((sys_get_virtual_time().low % (e-s) + s))
@@ -82,6 +83,9 @@ void 	sys_set_uheap_strategy(uint32 heapStrategy);
 
 //Page File
 int 	sys_pf_calculate_allocated_pages(void);
+
+//Graphics
+void    sys_render_window(struct window *win);
 
 //Semaphores
 void    sys_init_queue(struct Env_Queue *queue);
