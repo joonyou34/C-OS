@@ -1,3 +1,5 @@
+# 0 for text, 1 for graphics
+#define USE_GRAPHICS 1
 ###############################################################################
 # ENTRY POINT	
 #   This code should be stored in the first sector of the hard disk.
@@ -25,9 +27,15 @@ start:		.code16				# This runs in real mode
 		# Set up the stack pointer, growing downward from 0x7c00.
 		movw	$start,%sp         	# Stack Pointer
 
+		mov 	$USE_GRAPHICS, %ax
+		xor		%bx, %bx
+		cmp 	%ax, %bx
+		je	skip
+		clc
+		
 		# initiate video mode switch
 		movw	$0x4f02, %ax
-        movw	$0x4118, %bx
+        movw	$0x0118, %bx
         int	$0x10
 
 		# in case the mode set was successful, spin
@@ -39,11 +47,12 @@ start:		.code16				# This runs in real mode
 		movw    %ax, %es           
 		movw    $0x4f01, %ax       
 		movw    $0x0118, %cx       
-		int     $0x10              
+		int     $0x10
 
 		# in case the mode info query was successful, spin
-		jc      spin           
+		jc      spin
 
+skip:
 # Enable A20:
 #   For fascinating historical reasons (related to the fact that
 #   the earliest 8086-based PCs could only address 1MB of physical memory
@@ -65,7 +74,7 @@ seta20.2:	inb	$0x64,%al		# Get status
 
 	mov $0x02, %ah
 	mov	$1,	   %al 		  # number of sectors to read
-	mov $0x2, %cl        # Set sector to read (2nd sector)
+	mov $0x2,  %cl        # Set sector to read (2nd sector)
 	mov $0x00, %ch        # Set cylinder (0)
 	mov $0x00, %dh        # Set head (0, for the first platter)
 	mov $0x80, %dl        # Drive number (0x80 for the first hard disk)
@@ -78,8 +87,17 @@ seta20.2:	inb	$0x64,%al		# Get status
 
 	jc spin
 
-	lea     VesaModeInfoBlock, %eax    # Load the address of Mode Info Block
+	xor 	%ebx, %ebx
 
+	mov 	$USE_GRAPHICS, %ax
+	xor		%bx, %bx
+	cmp 	%ax, %bx
+	je	skip2
+	clc
+
+	lea     VesaModeInfoBlock, %ebx    # Load the address of Mode Info Block
+
+skip2:
 	jmp 0x8000
 
 spin:

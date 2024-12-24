@@ -5,11 +5,6 @@
 	
 .globl start2					# Entry point	
 start2:		.code16				# This runs in real mode
-		mov %eax, %ebx
-        # initiate videomode
-		# movb $0x00, %ah
-        # movb $0x13, %al
-        # int $0x10
 
 # Switch from real to protected mode:
 #   Up until now, there's been no protection, so we've gotten along perfectly

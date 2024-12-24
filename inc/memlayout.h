@@ -34,6 +34,8 @@
  *                     :              .               :
  *                     :              .               :
  *KERNEL_HEAP_START -> +------------------------------+ 0xf6000000
+                       |            				  | 
+ *     FRAME_BUFFER -> +------------------------------+ 0xf5C00000
  *                     :              .               :
  *                     :              .               :
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
@@ -113,6 +115,8 @@
 #define KERNEL_STACK_SIZE	(8*PAGE_SIZE)   			// size of a kernel stack (either for cpu scheduler stack or user kernel stack)
 #define USER_LIMIT			(KERN_STACK_TOP - PTSIZE)
 #define NCPUS 1
+
+#define FRAME_BUFFER 0xF5C00000
 
 /*
  * User read-only mappings! Anything below here til USER_TOP are readonly to user.
