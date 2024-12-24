@@ -58,6 +58,7 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/tests/test_kheap.c \
 			kern/tests/test_scheduler.c \
 			kern/tests/utilities.c \
+			kern/gpu/gpu.c \
 			lib/printfmt.c \
 			lib/readline.c \
 			lib/string.c \

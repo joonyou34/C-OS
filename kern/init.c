@@ -26,38 +26,37 @@
 #include <kern/tests/test_dynamic_allocator.h>
 #include <kern/tests/test_commands.h>
 #include <kern/disk/pagefile_manager.h>
-
-#include <inc/vesa_info.h>
+#include <kern/gpu/gpu.h>
 
 extern int sys_calculate_free_frames();
 
-//Functions Declaration
+// Functions Declaration
 //======================
 void print_welcome_message();
 //=======================================
 
-//First ever function called in FOS kernel
-bool autograde ;
-void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
+// First ever function called in FOS kernel
+bool autograde;
+void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 {
-	
-	//get actual addresses after code linking
+
+	// get actual addresses after code linking
 	extern char start_of_uninitialized_data_section[], end_of_kernel[];
 
-	//cprintf("*	1) Global data (BSS) section...");
+	// cprintf("*	1) Global data (BSS) section...");
 	{
 		// Before doing anything else,
 		// clear the uninitialized global data (BSS) section of our program, from start_of_uninitialized_data_section to end_of_kernel
 		// This ensures that all static/global variables start with zero value.
 		memset(start_of_uninitialized_data_section, 0, end_of_kernel - start_of_uninitialized_data_section);
 	}
-	//cprintf("[DONE]\n");
+	// cprintf("[DONE]\n");
 
 	{
 		// Initialize the console.
 		// Can't call cprintf until after we do this!
 		cons_init();
-		//print welcome message
+		// print welcome message
 		print_welcome_message();
 	}
 
@@ -67,11 +66,11 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 
 	cprintf("* 1) CPU...");
 	{
-		//Initialize the Main CPU
+		// Initialize the Main CPU
 		cpu_init(0);
 	}
 	cprintf("[DONE]\n");
-    
+
 	cprintf("* 2) MEMORY:\n");
 	{
 		// Lab 2 memory management initialization functions
@@ -84,32 +83,32 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 		initialize_kheap_dynamic_allocator(KERNEL_HEAP_START, PAGE_SIZE, KERNEL_HEAP_START + DYN_ALLOC_MAX_SIZE);
 #endif
 		//	page_check();
-		//setPageReplacmentAlgorithmNchanceCLOCK();
-		//setPageReplacmentAlgorithmLRU(PG_REP_LRU_TIME_APPROX);
+		// setPageReplacmentAlgorithmNchanceCLOCK();
+		// setPageReplacmentAlgorithmLRU(PG_REP_LRU_TIME_APPROX);
 		setPageReplacmentAlgorithmFIFO();
 
 		// DOZ added code
-		//setPageReplacmentAlgorithmNchanceCLOCK(1);
+		// setPageReplacmentAlgorithmNchanceCLOCK(1);
 
 		setUHeapPlacementStrategyFIRSTFIT();
 		setKHeapPlacementStrategyFIRSTFIT();
 
 		enableBuffering(0);
-		//enableModifiedBuffer(1) ;
-		enableModifiedBuffer(0) ;
+		// enableModifiedBuffer(1) ;
+		enableModifiedBuffer(0);
 		setModifiedBufferLength(1000);
 
 		ide_init();
 	}
-	//cprintf("* [DONE]\n");
+	// cprintf("* [DONE]\n");
 
 	cprintf("* 3) USER ENVs...");
 	{
 		// Lab 3 user environment initialization functions
 		env_init();
 		ts_init();
-		//2024: removed. called inside cpuinit()
-		//idt_init();
+		// 2024: removed. called inside cpuinit()
+		// idt_init();
 	}
 	cprintf("[DONE]\n");
 
@@ -117,66 +116,66 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 	{
 		pic_init();
 		cprintf("*	PIC is initialized\n");
-		//Enable Clock Interrupt
+		// Enable Clock Interrupt
 		irq_clear_mask(0);
 		cprintf("*	IRQ0 (Clock): is Enabled\n");
-		//Enable KB Interrupt
+		// Enable KB Interrupt
 		irq_clear_mask(1);
 		cprintf("*	IRQ1 (Keyboard): is Enabled\n");
-		//Enable COM1 Interrupt
+		// Enable COM1 Interrupt
 		irq_clear_mask(4);
 		cprintf("*	IRQ4 (COM1): is Enabled\n");
-		//Enable Primary ATA Hard Disk Interrupt
-//		irq_clear_mask(14);
-//		cprintf("*	IRQ14 (Primary ATA Hard Disk): is Enabled\n");
+		// Enable Primary ATA Hard Disk Interrupt
+		//		irq_clear_mask(14);
+		//		cprintf("*	IRQ14 (Primary ATA Hard Disk): is Enabled\n");
 	}
 	cprintf("* 5) SCHEDULER & MULTI-TASKING:\n");
 	{
 		// Lab 4 multitasking initialization functions
 		kclock_init();
-		sched_init() ;
+		sched_init();
 	}
-	//cprintf("* [DONE]\n");
+	// cprintf("* [DONE]\n");
 
 	cprintf("* 6) ESP to SCHED KERN STACK:\n");
 	{
-		//Relocate SP to its corresponding location in the specific stack area below KERN_BASE (SCHD_KERN_STACK_TOP)
+		// Relocate SP to its corresponding location in the specific stack area below KERN_BASE (SCHD_KERN_STACK_TOP)
 		uint32 old_sp = read_esp();
-		uint32 sp_offset = (uint32)ptr_stack_top - old_sp ;
+		uint32 sp_offset = (uint32)ptr_stack_top - old_sp;
 		uint32 new_sp = KERN_STACK_TOP - sp_offset;
 		write_esp(new_sp);
 		cprintf("*	old SP = %x - updated SP = %x\n", old_sp, read_esp());
 	}
 
 	cprintf("* 7) GPU?\n");
-	if(VESA_mode_info != 0)
+	if (VESA_mode_info != 0)
 	{
-        frame_buffer = (uint8*)FRAME_BUFFER;
+		frame_buffer = (uint8 *)FRAME_BUFFER;
 
-		struct vbe_mode_info_structure* mode_info = (struct vbe_mode_info_structure*)(((char*)VESA_mode_info + KERNEL_BASE));
+		struct vbe_mode_info_structure *mode_info = (struct vbe_mode_info_structure *)(((char *)VESA_mode_info + KERNEL_BASE));
 		uint32 buffer_size = mode_info->width * mode_info->height * sizeof(int);
 		uint32 buffer_limit = mode_info->framebuffer + buffer_size;
 
 		uint32 cur_page = FRAME_BUFFER;
 
-        uint32* ptr_page_table = NULL;
-        get_page_table(ptr_page_directory, cur_page, &ptr_page_table);
+		uint32 *ptr_page_table = NULL;
+		get_page_table(ptr_page_directory, cur_page, &ptr_page_table);
 
-		for(uint32 pa = mode_info->framebuffer; pa < buffer_limit; pa += PAGE_SIZE) {
+		for (uint32 pa = mode_info->framebuffer; pa < buffer_limit; pa += PAGE_SIZE)
+		{
 			uint32 pte_available_bits = ptr_page_table[PTX(cur_page)] & PERM_AVAILABLE;
 			ptr_page_table[PTX(cur_page)] = CONSTRUCT_ENTRY(pa, pte_available_bits | PERM_WRITEABLE | PERM_PRESENT);
-			
+
 			cur_page += PAGE_SIZE;
 		}
 
 		uint32 w = mode_info->width, h = mode_info->height;
 
-		for(int y = 0; y < h; y++) {
-			for(int x = 0; x < w; x++) {
-				uint32 idx = (y*w+x)*3;
-				frame_buffer[idx] = (x*255)/w;			//blue
-				frame_buffer[idx+1] = ((x*255)/w)/2;    //green
-				frame_buffer[idx+2] = ((w-x-1)*255)/w;	//red
+		for (int y = 0; y < h; y++)
+		{
+			for (int x = 0; x < w; x++)
+			{
+				draw_pixel(frame_buffer, w, h, x, y, (x * 255) / w, ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
 			}
 		}
 	}
@@ -184,7 +183,7 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 
 	// start the kernel command prompt.
 	autograde = 0;
-	while (1==1)
+	while (1 == 1)
 	{
 		cprintf("\nWelcome to the FOS kernel command prompt!\n");
 		cprintf("Type 'help' for a list of commands.\n");
@@ -193,7 +192,6 @@ void FOS_initialize(struct vbe_mode_info_structure* VESA_mode_info)
 
 	// cprintf("initialize N chance!!!");
 }
-
 
 void print_welcome_message()
 {
@@ -206,7 +204,6 @@ void print_welcome_message()
 	cprintf("\n\n\n\n");
 }
 
-
 /*
  * Variable panicstr contains argument to first call to panic; used as flag
  * to indicate that the kernel has already called panic.
@@ -217,13 +214,13 @@ static const char *panicstr;
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", exit the curenv and schedule the next environment.
  */
-void _panic(const char *file, int line, const char *fmt,...)
+void _panic(const char *file, int line, const char *fmt, ...)
 {
-	struct Env* cur_env = get_cpu_proc();
+	struct Env *cur_env = get_cpu_proc();
 
 	va_list ap;
 
-	//if (panicstr)
+	// if (panicstr)
 	//	goto dead;
 	panicstr = fmt;
 
@@ -233,33 +230,32 @@ void _panic(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
-	dead:
+dead:
 	/* break into the fos scheduler */
-	//2013: Check if the panic occur when running an environment
+	// 2013: Check if the panic occur when running an environment
 	if (cur_env != NULL && cur_env->env_status == ENV_RUNNING)
 	{
-		//cprintf("\n>>>>>>>>>>> exiting the cur env<<<<<<<<<<<<\n");
-		//Place the running env into the exit queue then switch to the scheduler
-		env_exit(); //env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
+		// cprintf("\n>>>>>>>>>>> exiting the cur env<<<<<<<<<<<<\n");
+		// Place the running env into the exit queue then switch to the scheduler
+		env_exit(); // env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
 	}
-	//else //2024: panic from Kernel and no current running env
+	// else //2024: panic from Kernel and no current running env
 	{
-		char* esp = (char*)read_esp();
+		char *esp = (char *)read_esp();
 		cprintf("esp = %x\n", esp);
 		get_into_prompt();
 	}
-
 }
 
 /*
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", exit all env's and then enters the kernel command prompt.
  */
-void _panic_all(const char *file, int line, const char *fmt,...)
+void _panic_all(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
 
-	//if (panicstr)
+	// if (panicstr)
 	//	goto dead;
 	panicstr = fmt;
 
@@ -269,26 +265,26 @@ void _panic_all(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
-	dead:
+dead:
 	/* break into the command prompt */
 	pushcli();
 	struct cpu *c = mycpu();
 	int sched_stat = c->scheduler_status;
 	popcli();
-	/*2022*///Check if the scheduler is successfully initialized or not
+	/*2022*/ // Check if the scheduler is successfully initialized or not
 	if (sched_stat != SCH_UNINITIALIZED)
 	{
-		//exit all ready env's
+		// exit all ready env's
 		sched_exit_all_ready_envs();
-		struct Env* cur_env = get_cpu_proc();
+		struct Env *cur_env = get_cpu_proc();
 		if (cur_env != NULL && cur_env->env_status == ENV_RUNNING)
 		{
-			//cprintf("exit curenv...........\n");
-			//Place the running env into the exit queue then switch to the scheduler
-			env_exit(); //env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
+			// cprintf("exit curenv...........\n");
+			// Place the running env into the exit queue then switch to the scheduler
+			env_exit(); // env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
 		}
 	}
-	//else //2024: panic from Kernel and no current running env
+	// else //2024: panic from Kernel and no current running env
 	{
 		get_into_prompt();
 	}
@@ -298,11 +294,11 @@ void _panic_all(const char *file, int line, const char *fmt,...)
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", exit the curenv (if any) and break into the command prompt.
  */
-void _panic_into_prompt(const char *file, int line, const char *fmt,...)
+void _panic_into_prompt(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
 
-	//if (panicstr)
+	// if (panicstr)
 	//	goto dead;
 	panicstr = fmt;
 
@@ -312,23 +308,21 @@ void _panic_into_prompt(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
-//	dead:
+	//	dead:
 	/* break into the fos scheduler */
-	//2013: Check if the panic occur when running an environment
-	struct Env* cur_env = get_cpu_proc();
+	// 2013: Check if the panic occur when running an environment
+	struct Env *cur_env = get_cpu_proc();
 	if (cur_env != NULL && cur_env->env_status == ENV_RUNNING)
 	{
-		//Place the running env into the exit queue then switch to the scheduler
-		env_exit(); //env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
+		// Place the running env into the exit queue then switch to the scheduler
+		env_exit(); // env_exit --> sched_exit_env --> sched --> context_switch into fos_scheduler
 	}
 
 	get_into_prompt();
-
 }
 
-
 /* like panic, but don't enters the kernel command prompt*/
-void _warn(const char *file, int line, const char *fmt,...)
+void _warn(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -338,5 +332,3 @@ void _warn(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 }
-
-
