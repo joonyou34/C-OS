@@ -24,6 +24,9 @@ int last_command_idx = -1;
 char command_history[HISTORY_MAX+1][BUFLEN];
 char empty[BUFLEN];
 
+const int font_scale = 2;
+const int shft_row = 2*8+1;
+const int shft_col = 2*8+7;
 uint8 font_data[128][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x3E, 0x41, 0x55, 0x41, 0x55, 0x49, 0x3E},
@@ -154,6 +157,33 @@ uint8 font_data[128][8] = {
     {0x00, 0x00, 0x00, 0x3A, 0x6C, 0x00, 0x00, 0x00},
     {0x00, 0x08, 0x1C, 0x36, 0x63, 0x41, 0x41, 0x7F}};
 
+
+void draw_char(int y,int x,int index,int scale ){
+	if(index>128){
+		cprintf("Invalid char\n");
+		return;
+	}
+
+	for (int row = 0; row < 8; row++) {
+			// if ( y + row >= height) break;
+		unsigned char row_data = font_data[index][row];
+		
+		for (int col = 0; col < 8; col++) {
+
+
+            // if (x + col >= win->width) break;
+			
+            if (row_data & (1 << (7 - col))) {
+				for(int dx= 0 ;dx<scale;dx++){
+					for(int dy = 0;dy<scale;dy++){
+		                kdraw_pixel_hex(row*scale+x*shft_col,col*scale+y*shft_row, 0xFFFFFFFF);  // Use '#' for filled pixels
+
+					}
+				}
+            }
+        }
+    }
+}
 void clearandwritecommand(int* i, int commandidx, char* buf, int *last_index) {
 	for (int j = 0; j < *i; j++) {
 		cputchar('\b');
@@ -162,6 +192,7 @@ void clearandwritecommand(int* i, int commandidx, char* buf, int *last_index) {
 	memcpy(buf, empty, BUFLEN);
 	for (*i = 0; *i < len; (*i)++) {
 		cputchar(command_history[commandidx][*i]);
+		draw_char((*i),commandidx,(int)command_history[commandidx][*i],font_scale);
 		buf[*i] = command_history[commandidx][*i];
 	}
 	*last_index = len;
@@ -188,27 +219,10 @@ void clear_prefix_list()
 	for (int i = 0; i < 100; ++i) {
 		memset(PrefixList[i], 0, 1024);}
 }
-void draw_char(int y,int x,int index,int scale ){
-	if(index>128){
-		cprintf("Invalid char\n");
-		return;
-	}
-    for (int row = 0; row < 8; row++) {
-        // if ( y + row >= height) break;
 
-        unsigned char row_data = font_data[index][row];
 
-        for (int col = 0; col < 8; col++) {
-            // if (x + col >= win->width) break;
-			
-            if (row_data & (1 << (7 - col))) {
-                kdraw_pixel_hex(col+x,row+y, 0xFFFFFFFF);  // Use '#' for filled pixels
-            }
-        }
-    }
-}
 void GUI_command_prompt_readline(const char *prompt, char * buf){
-	int i, c, echoing, lastIndex;
+		int i, c, echoing, lastIndex;
 		if (prompt != NULL)
 			cprintf("%s", prompt);
 		// GPU
@@ -220,10 +234,12 @@ void GUI_command_prompt_readline(const char *prompt, char * buf){
 		bool is_tst_cmd = 0;
 
 		while (1) {    
+			
 			//ffff
 			c = getchar();
 			if (i > lastIndex)
 				lastIndex = i;
+			
 			if (c < 0) {
 
 				if (c != -E_EOF)
@@ -345,6 +361,7 @@ void GUI_command_prompt_readline(const char *prompt, char * buf){
 							cputchar('\b');}
 						for (int j = 0; j < strlen(buf); ++j) {
 							cputchar(buf[j]);
+							// draw_char(j*10,last_command_idx*9,(int)buf[j],font_scale);
 						}
 						i = lastIndex = strlen(buf);
 					}
@@ -377,6 +394,7 @@ void GUI_command_prompt_readline(const char *prompt, char * buf){
 			else if (c >= ' ' && i < BUFLEN - 1 && c != 229 && c != 228) {
 				if (echoing)
 					cputchar(c);
+
 				buf[i++] = c;
 				lastIndex++;
 			} else if (c == '\b' && i > 0) {
@@ -389,9 +407,10 @@ void GUI_command_prompt_readline(const char *prompt, char * buf){
 				i--;
 			} else if (c == '\n' || c == '\r') {
 
-				if (echoing)
+				if (echoing){
 					cputchar(c);
 
+				}
 				buf[lastIndex] = 0;
 				if (last_command_idx == HISTORY_MAX) {
 					for (int idx = 0; idx < HISTORY_MAX; idx++) {
@@ -402,19 +421,23 @@ void GUI_command_prompt_readline(const char *prompt, char * buf){
 				} else if (strcmp(command_history[last_command_idx], buf) != 0) {
 					memcpy(command_history[++last_command_idx], buf, BUFLEN);
 				}
+
+				for (int j = 0; j < strlen(buf); ++j) {
+					draw_char(j,last_command_idx,(int)buf[j],font_scale);
+				}
 				return;
 				
 			}
 			last_c = c;
 
-			for(int row = 0;row<=last_command_idx;row++){
-				int len = strlen(command_history[row]);
+			// for(int row = 0;row<=last_command_idx;row++){
+			// 	int len = strlen(command_history[row]);
 
-				for(int col = 0;col<len;col++){
-					int c = command_history[row][col];
-					draw_char(col*(12),row*(10),c,2);
-				}
-			}
+			// 	for(int col = 0;col<len;col++){
+			// 		int c = command_history[row][col];
+			// 		draw_char(col*(10),row*(9),c,font_scale);
+			// 	}
+			// }
 		}
 }
 
