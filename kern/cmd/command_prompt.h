@@ -11,6 +11,9 @@
 #include <inc/disk.h>
 #include <inc/error.h>
 
+// Fonts array for GUI cmd
+extern uint8 font_data[128][8];
+
 /*2024*/
 //Structure for commands list
 typedef LIST_ENTRY(Command) Command_LIST_entry_t;
@@ -30,6 +33,10 @@ CMD_MATCHED,
 int execute_command(char *command_string);
 void command_prompt_readline(const char *, char *);
 void get_into_prompt() __attribute__((noreturn));
+
+// GUI command prompt functions
+void GUI_command_prompt_readline(const char *,char *);
+// void draw_char(int c);
 
 /*2024*/
 int process_command(int number_of_arguments, char** arguments);
