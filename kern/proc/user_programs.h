@@ -139,4 +139,8 @@ DECLARE_START_OF(tst_page_replacement_nthclock_1);
 DECLARE_START_OF(tst_page_replacement_nthclock_2);
 DECLARE_START_OF(tst_page_replacement_stack);
 
+
+// 2025
+DECLARE_START_OF(dummy_graphics);
+
 #endif /* KERN_USER_PROGRAMS_H_ */

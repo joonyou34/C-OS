@@ -150,32 +150,9 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 	cprintf("* 7) GPU?\n");
 	if (VESA_mode_info != 0)
 	{
-		frame_buffer = (uint8 *)FRAME_BUFFER;
-
-		struct vbe_mode_info_structure *mode_info = (struct vbe_mode_info_structure *)(((char *)VESA_mode_info + KERNEL_BASE));
-		uint32 buffer_size = mode_info->width * mode_info->height * sizeof(int);
-		uint32 buffer_limit = mode_info->framebuffer + buffer_size;
-
-		uint32 cur_page = FRAME_BUFFER;
-
-		uint32 *ptr_page_table = NULL;
-		get_page_table(ptr_page_directory, cur_page, &ptr_page_table);
-
-		for (uint32 pa = mode_info->framebuffer; pa < buffer_limit; pa += PAGE_SIZE)
-		{
-			uint32 pte_available_bits = ptr_page_table[PTX(cur_page)] & PERM_AVAILABLE;
-			ptr_page_table[PTX(cur_page)] = CONSTRUCT_ENTRY(pa, pte_available_bits | PERM_WRITEABLE | PERM_PRESENT);
-
-			cur_page += PAGE_SIZE;
-		}
-
-		// INITIALIZE THE GPU
-		GPU.vbe_mode = VESA_mode_info;
-		GPU.framebuffer = *frame_buffer;
-		init_spinlock(&GPU.lock, "framesuffer");
-
-		uint32 w = mode_info->width, h = mode_info->height;
-
+		initialize_gpu(VESA_mode_info);
+		
+		uint32 w = GPU.mode_info->width, h = GPU.mode_info->height;
 		for (int y = 0; y < h; y++)
 		{
 			for (int x = 0; x < w; x++)
@@ -183,9 +160,9 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 				// draw_pixel(frame_buffer, w, h, x, y, , ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
 
 				uint32 idx = (y * w + x) * 3;
-				frame_buffer[idx] = (x * 255) / w;
-				frame_buffer[idx + 1] = (x * 255) / w;
-				frame_buffer[idx + 2] = (x * 255) / w;
+				GPU.framebuffer[idx] = (x * 255) / w;   // blue
+				GPU.framebuffer[idx + 1] = (x * 255) / w; // green
+				GPU.framebuffer[idx + 2] = (x * 255) / w; // red
 			}
 		}
 	}

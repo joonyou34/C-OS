@@ -1,6 +1,6 @@
 #include <inc/x86.h>
 #include <inc/elf.h>
-#include <inc/vesa_info.h>
+#include <kern/gpu/gpu.h>
 
 /**********************************************************************
  * This a dirt simple boot loader, whose sole job is to boot
@@ -55,6 +55,7 @@ cmain(struct vbe_mode_info_structure* mode_info)
 		
 	// call the entry point from the ELF header
 	// note: does not return!
+	// make sure to pass the vesa mode info block pointer to the entry.S as well
 	((void (*)(void *)) (ELFHDR->e_entry & 0xFFFFFF))((void*)mode_info);
 
 bad:

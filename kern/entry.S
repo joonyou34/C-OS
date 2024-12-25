@@ -44,6 +44,7 @@
 
 .globl		start_of_kernel
 start_of_kernel:
+	# retrieving the veas mode info block pointer from memory (passed as a paramater in the main.c file)
 	movl    4(%esp), %ebx
 	movw	$0x1234,0x472			# warm boot
 
@@ -69,8 +70,9 @@ relocated:
 	# movl	$(ptr_stack_top-SIZEOF_STRUCT_TRAPFRAME),%esp
 	movl	$(ptr_stack_top),%esp
 
-	# now to C code
+	# again, passing the vesa mode info block pointer but to the init.c this time
 	pushl %ebx
+	# now to C code
 	call	FOS_initialize
 
 	# Should never get here, but in case we do, just spin.

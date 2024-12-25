@@ -121,6 +121,9 @@ struct UserProgramInfo userPrograms[] = {
 		{ "tshr5slaveB1", "Slave program to be used with tshr5", PTR_START_OF(tst_sharing_5_slaveB1)},
 		{ "tshr5slaveB2", "Slave program to be used with tshr5", PTR_START_OF(tst_sharing_5_slaveB2)},
 		{ "tf3", "tests free (3): freeing buffers, tables, WS and page file [REplacement case]", PTR_START_OF(tst_free_3)},
+
+		// [4] GUI PROGRAMS
+		{ "gui1", "tests simple window rendering", PTR_START_OF(dummy_graphics)},
 };
 
 ///=========================================================

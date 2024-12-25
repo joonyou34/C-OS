@@ -116,6 +116,7 @@
 #define USER_LIMIT			(KERN_STACK_TOP - PTSIZE)
 #define NCPUS 1
 
+// the virtual address assigned to the framebuffer
 #define FRAME_BUFFER 0xF5C00000
 
 /*

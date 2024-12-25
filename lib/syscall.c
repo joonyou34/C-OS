@@ -357,3 +357,7 @@ void sys_render_window(struct window *win)
 {
 	syscall(SYS_render_window, (uint32)win, 0, 0, 0, 0);
 }
+void sys_get_display_info(struct display_info * di)
+{
+	syscall(SYS_get_display_info, (uint32) di, 0, 0, 0, 0);
+}

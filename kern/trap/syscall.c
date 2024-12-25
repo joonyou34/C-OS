@@ -354,7 +354,11 @@ void sys_set_uheap_strategy(uint32 heapStrategy)
 
 void sys_render_window(struct window *win)
 {
-	return render_window(win);
+	return krender_window(win);
+}
+void sys_get_display_info(struct display_info * di)
+{
+	kget_display_info(di);
 }
 
 /*******************************/
@@ -765,6 +769,10 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		break;
 	case SYS_render_window:
 		sys_render_window((struct window *)a1);
+		return 0;
+		break;
+	case SYS_get_display_info:
+		sys_get_display_info((struct display_info *) a1);
 		return 0;
 		break;
 

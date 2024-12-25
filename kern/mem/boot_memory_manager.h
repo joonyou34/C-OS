@@ -24,7 +24,6 @@ uint8* ptr_temp_page;				// Virtual address of a page used by program loader to 
 uint32 phys_page_directory;			// Physical address of boot time page directory
 char* ptr_free_mem;					// Pointer to next byte of free mem
 
-uint8* frame_buffer;
 
 //struct FrameInfo* disk_frames_info;	// Virtual address of physical frames_info array
 struct FrameInfo* frames_info;		// Virtual address of physical frames_info array

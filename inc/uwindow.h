@@ -1,15 +1,24 @@
 #ifndef FOS_INC_UWINDOW_H
 #define FOS_INC_UWINDOW_H 1
 
+#include <inc/color.h>
 struct window
 {
-    uint32 *buffer;
-    uint32 width;
-    uint32 height;
+    uint32 *buffer; // the buffer holding the pixel data, size is width*height
+    uint16 width;
+    uint16 height;
 };
 
-int init_window(struct window *win, uint32 width, uint32 height);
+struct display_info {
+    uint16 width;
+    uint16 height;
+    uint8 bpp; //bits per pixel (how many bits per color/pixel)
+};
 
-void draw_pixel(uint8 *fb, uint32 width, uint32 height, uint32 x, uint32 y, uint32 r, uint32 g, uint32 b);
+int init_window(struct window* win, uint16 width, uint16 height);
+void draw_pixel(struct window* win, uint16 col, uint16 row, color_t color_rgba);
+void draw_pixel_hex(struct window* win, uint16 col, uint16 row, uint32 color_hex);
+void render_window(struct window* win);
+
 
 #endif

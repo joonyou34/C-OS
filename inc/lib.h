@@ -20,6 +20,8 @@
 #include <inc/syscall.h>
 #include <inc/uheap.h>
 #include <inc/dynamic_allocator.h>
+
+//gpu includes
 #include <inc/uwindow.h>
 
 #define USED(x)		(void)(x)
@@ -86,6 +88,7 @@ int 	sys_pf_calculate_allocated_pages(void);
 
 //Graphics
 void    sys_render_window(struct window *win);
+void    sys_get_display_info(struct display_info * di);
 
 //Semaphores
 void    sys_init_queue(struct Env_Queue *queue);

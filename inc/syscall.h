@@ -64,6 +64,7 @@ enum
 	SYS_sched_insert_ready,
 	SYS_env_set_priority,
 	SYS_render_window,
+	SYS_get_display_info,
 	//=====================================================================
 	NSYSCALLS
 };
