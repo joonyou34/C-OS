@@ -40,6 +40,17 @@ int text_length = 0;
 
 static bool serial_exists;
 
+const uint32 SHIFT_ROW = FONT_SCALE*8;
+const uint32 SHIFT_COL = FONT_SCALE*8;
+
+uint16 max_horizontal_text = 0;
+uint32 max_vertical_text = 0;
+uint32 console_text_color_hex = MAKE_COLOR_HEX(255, 255, 255, 255);
+uint32 console_bg_color_hex = MAKE_COLOR_HEX(0, 0, 0, 255);
+// uint16 row = 0, col = 0, extra_line_ct = 0;
+int gui_buff_st, gui_buff_ed = 0, gui_buff_idx = 0, lst_line_idx = 0;
+uint8 gui_cmd_buffer[GUI_CMD_BUFFER_SIZE];
+
 int
 serial_proc_data(void)
 {
@@ -179,18 +190,16 @@ cga_putc(int c)
 	case '\r':
 		crt_pos -= (crt_pos % CRT_COLS);
 		break;
-	case '\t':
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
+	case '\t': {
+		for(int i = 0; i < TAB_SPACE; i++)
+			cons_putc(' ');
 		break;
-	case 228:
+	}
+	case LEFT_ARROW:
 		if(crt_pos>0)
 			crt_pos--;
 		break;
-	case 229:
+	case RIGHT_ARROW:
 		if (crt_pos < CRT_SIZE)
 			crt_pos++;
 		break;
@@ -465,18 +474,174 @@ cons_getc2(void)
 	return 0;
 }
 
+// void gpu_putc(int c) {
+// 	kdraw_char_hex(row*SHIFT_ROW+CURSOR_SPACING*FONT_SCALE, col*SHIFT_COL, '_', FONT_SCALE, console_bg_color_hex, 0);
+// 	switch(c) {
+// 		case '\n':
+// 			kdraw_char_hex(row*SHIFT_ROW, col*SHIFT_COL, ' ', FONT_SCALE, console_text_color_hex, console_bg_color_hex);
+// 			row++;
+// 		case '\r':
+// 			col = 0;
+// 			break;
+// 		case '\b':
+// 			gpu_putc(LEFT_ARROW);
+// 			kdraw_char_hex(row*SHIFT_ROW, col*SHIFT_COL, ' ', FONT_SCALE, console_text_color_hex, console_bg_color_hex);
+// 			break;
+// 		case LEFT_ARROW:
+// 			if(col || extra_line_ct) {
+// 				if(!col) {
+// 					col = max_horizontal_text;
+// 					extra_line_ct--;
+// 					row--;
+// 				}
+// 				col--;
+// 			}
+// 			break;
+// 		case RIGHT_ARROW:
+// 			col++;
+// 			if(col == max_horizontal_text) {
+// 				col = 0;
+// 				extra_line_ct++;
+// 				row++;
+// 			}
+// 			break;
+// 		default:
+// 			kdraw_char_hex(row*SHIFT_ROW, col*SHIFT_COL, c, FONT_SCALE, console_text_color_hex, console_bg_color_hex);
+// 			gpu_putc(RIGHT_ARROW);
+// 	}
+// 	kdraw_char_hex(row*SHIFT_ROW + CURSOR_SPACING*FONT_SCALE, col*SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
+// }
+
+
+#define ABS(a) ((a < 0) ? -a : a)
+#define CYCLIC_SIZE(start, end) (ABS(end-start)+1)
+
+void inc_gui_buffer() {
+	if(CYCLIC_SIZE(gui_buff_st, gui_buff_ed) == GUI_CMD_BUFFER_SIZE)
+		gui_buff_st++;
+	gui_buff_ed++;
+}
+
+bool gpu_putc(int c) {
+	if(c == '\t') return 0;
+	bool ret = 0;
+	switch(c) {
+		case '\r':
+			gui_buff_idx = lst_line_idx;
+			break;
+		case '\b': {
+			uint32 cur_idx = gui_buff_idx;
+			if(gpu_putc(LEFT_ARROW)) {
+				gui_cmd_buffer[gui_buff_idx] = ' ';
+				gui_buff_ed--;
+				if(gui_buff_ed == -1)
+					gui_buff_ed += GUI_CMD_BUFFER_SIZE;
+				if(gui_buff_ed < cur_idx) {
+					uint32 right_size = GUI_CMD_BUFFER_SIZE-cur_idx+1;
+					memcpy(gui_cmd_buffer+gui_buff_idx, gui_cmd_buffer+cur_idx, right_size);
+					memcpy(gui_cmd_buffer+gui_buff_idx+right_size, gui_cmd_buffer, gui_buff_ed+1);
+				}
+				else {
+					memcpy(gui_cmd_buffer+gui_buff_idx, gui_cmd_buffer+cur_idx, gui_buff_ed-cur_idx+1);
+				}
+			}
+			break;
+		}
+		case LEFT_ARROW:
+			if(gui_buff_idx != gui_buff_st) {
+				gui_buff_idx--;
+				if(gui_buff_idx == -1)
+					gui_buff_idx += GUI_CMD_BUFFER_SIZE;
+				ret = 1;
+			}
+			break;
+		case RIGHT_ARROW:
+			if(gui_buff_idx != gui_buff_ed)
+				gui_buff_idx++;
+			break;
+		case '\n':
+			lst_line_idx = (gui_buff_idx+1)%GUI_CMD_BUFFER_SIZE;
+		default:
+			gui_cmd_buffer[gui_buff_idx] = c;
+			if(gui_buff_idx == gui_buff_ed)
+				gui_buff_ed++;
+			gui_buff_idx++;
+	}
+
+	gui_buff_idx %= GUI_CMD_BUFFER_SIZE;
+	gui_buff_ed  %= GUI_CMD_BUFFER_SIZE;
+	gui_buff_st  %= GUI_CMD_BUFFER_SIZE;
+	
+	return ret;
+}
+
+uint8 tst_buff[GUI_CMD_BUFFER_SIZE];
+
+#define NEXT(idx) ((idx+1)%GUI_CMD_BUFFER_SIZE)
+
+#define PREV(idx) ((idx-1+GUI_CMD_BUFFER_SIZE)%GUI_CMD_BUFFER_SIZE)
+
+void draw_gui_console() {
+	acquire_spinlock(&GPU.lock);
+	uint32 tmp = (uint32)GPU.framebuffer;
+	GPU.framebuffer = tst_buff;
+	
+	uint32 sz = GPU.mode_info->width*GPU.mode_info->height*(GPU.mode_info->bpp/8);
+	memset(GPU.framebuffer, 0, sz);
+	int st;
+	uint32 row_ct = 0, col_ct = 0;
+	for(st = gui_buff_ed; st != gui_buff_st; st = PREV(st)) {
+		col_ct++;
+		if(gui_cmd_buffer[st] == '\n') {
+			row_ct++, col_ct = 0;
+		}
+		if(col_ct == max_horizontal_text) {
+			row_ct++, col_ct = 1;
+		}
+		if(row_ct == max_vertical_text) {
+			st = NEXT(st);
+			break;
+		}
+	}
+
+	row_ct = 0, col_ct = 0;
+	for(; st != gui_buff_ed; st = NEXT(st)) {
+		uint8 c = gui_cmd_buffer[st];
+		if(c == '\n') {
+			row_ct++, col_ct = 0;
+			continue;
+		}
+		if(col_ct == max_horizontal_text)
+			row_ct++, col_ct = 0;
+		if(st == gui_buff_idx)
+			kdraw_char_hex(row_ct*SHIFT_ROW + CURSOR_SPACING*FONT_SCALE, col_ct*SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
+		kdraw_char_hex(row_ct*SHIFT_ROW, col_ct*SHIFT_COL, c, FONT_SCALE, console_text_color_hex, console_bg_color_hex);
+		col_ct++;
+	}
+	if(st == gui_buff_idx)
+		kdraw_char_hex(row_ct*SHIFT_ROW + CURSOR_SPACING*FONT_SCALE, col_ct*SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
+	memcpy((uint8*)tmp, GPU.framebuffer, sz);
+	GPU.framebuffer = (uint8*)tmp;
+	release_spinlock(&GPU.lock);
+}
+
 // output a character to the console
 void
 cons_putc(int c)
 {
-	lpt_putc(c);
 	cga_putc(c);
+	lpt_putc(c);
+	if(GPU_ON) {
+		gpu_putc(c);
+	}
 }
 
 // initialize the console devices
 void
 cons_init(void)
 {
+	max_horizontal_text = GPU.mode_info->width/(8*FONT_SCALE);
+	max_vertical_text = (GPU.mode_info->height/(8*FONT_SCALE)) - 1;
 	cga_init();
 	kbd_init();
 	serial_init();

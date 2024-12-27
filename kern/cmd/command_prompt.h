@@ -11,8 +11,6 @@
 #include <inc/disk.h>
 #include <inc/error.h>
 
-// Fonts array for GUI cmd
-extern uint8 font_data[128][8];
 
 /*2024*/
 //Structure for commands list

@@ -5,6 +5,8 @@
 #include <inc/stdio.h>
 #include <inc/stdarg.h>
 #include <kern/cpu/cpu.h>
+#include <kern/cons/console.h>
+#include <kern/gpu/gpu.h>
 
 
 static void
@@ -35,6 +37,8 @@ cprintf(const char *fmt, ...)
 		va_start(ap, fmt);
 		cnt = vcprintf(fmt, ap);
 		va_end(ap);
+		if(GPU_ON)
+			draw_gui_console();
 	}
 	popcli();	//enable interrupts
 

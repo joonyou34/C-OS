@@ -5,6 +5,7 @@
 #include <inc/color.h>
 #include <kern/conc/channel.h>
 
+extern bool GPU_ON;
 
 // the mode info block struct, reference: https://wiki.osdev.org/VESA_Video_Modes
 struct vbe_mode_info_structure {
@@ -51,9 +52,25 @@ struct gpu
     struct spinlock lock; // the framebuffer lock
 } GPU;
 
-void initialize_gpu();
+// Fonts array for text, credits for the font: https://github.com/dhepper/font8x8
+extern uint8 font_data[256][8];
+
+void initialize_gpu(struct vbe_mode_info_structure *VESA_mode_info);
+void boot_initialize_gpu(struct vbe_mode_info_structure *VESA_mode_info);
+
 void krender_window(struct window* win);
-void kdraw_pixel(uint32 ,uint32 , color_t); // row, col, color
-void kdraw_pixel_hex(uint32 ,uint32 ,uint32); // row, col, color
+
+void kdraw_pixel(uint32 row,uint32 col, color_t color_rgba); // row, col, color
+void kdraw_pixel_hex(uint32 row,uint32 col ,uint32 color_hex); // row, col, color
+
+void kdraw_rectangle_filled(uint32 top_left_row, uint32 top_left_col, uint32 bot_right_row, uint32 bot_right_col, color_t color_rgba);
+void kdraw_rectangle_filled_hex(uint32 top_left_row, uint32 top_left_col, uint32 bot_right_row, uint32 bot_right_col, uint32 color_hex);
+
+void kdraw_square_filled(uint32 top_left_row, uint32 top_left_col, uint32 size, color_t color_rgba);
+void kdraw_square_filled_hex(uint32 top_left_row, uint32 top_left_col, uint32 size, uint32 color_hex);
+
+void kdraw_char(uint32 row, uint32 col, char character, uint32 scale, color_t text_color_rgba, color_t bg_color_rgba);
+void kdraw_char_hex(uint32 row, uint32 col, char character, uint32 scale, uint32 text_color_hex, uint32 bg_color_hex);
+
 void kget_display_info(struct display_info* ret);
 #endif

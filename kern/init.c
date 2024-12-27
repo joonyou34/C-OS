@@ -53,6 +53,10 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 	// cprintf("[DONE]\n");
 
 	{
+		// initalize the boot gpu for the gui console
+		if(VESA_mode_info != 0) {
+			boot_initialize_gpu(VESA_mode_info);
+		}
 		// Initialize the console.
 		// Can't call cprintf until after we do this!
 		cons_init();
@@ -70,7 +74,6 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 		cpu_init(0);
 	}
 	cprintf("[DONE]\n");
-
 	cprintf("* 2) MEMORY:\n");
 	{
 		// Lab 2 memory management initialization functions
@@ -99,6 +102,26 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 		setModifiedBufferLength(1000);
 
 		ide_init();
+	}
+
+	if (GPU_ON)
+	{
+		initialize_gpu(VESA_mode_info);
+		cprintf("* 2.5) GPU\n");
+		
+		// uint32 w = GPU.mode_info->width, h = GPU.mode_info->height;
+		// for (int y = 0; y < h; y++)
+		// {
+		// 	for (int x = 0; x < w; x++)
+		// 	{
+		// 		// draw_pixel(frame_buffer, w, h, x, y, , ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
+
+		// 		uint32 idx = (y * w + x) * 3;
+		// 		GPU.framebuffer[idx] = (x * 255) / w;   // blue
+		// 		GPU.framebuffer[idx + 1] = (x * 255) / w; // green
+		// 		GPU.framebuffer[idx + 2] = (x * 255) / w; // red
+		// 	}
+		// }
 	}
 	// cprintf("* [DONE]\n");
 
@@ -146,26 +169,6 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 		write_esp(new_sp);
 		cprintf("*	old SP = %x - updated SP = %x\n", old_sp, read_esp());
 	}
-
-	cprintf("* 7) GPU?\n");
-	if (VESA_mode_info != 0)
-	{
-		initialize_gpu(VESA_mode_info);
-		
-		uint32 w = GPU.mode_info->width, h = GPU.mode_info->height;
-		for (int y = 0; y < h; y++)
-		{
-			for (int x = 0; x < w; x++)
-			{
-				// draw_pixel(frame_buffer, w, h, x, y, , ((x * 255) / w) / 2, ((w - x - 1) * 255) / w);
-
-				uint32 idx = (y * w + x) * 3;
-				GPU.framebuffer[idx] = (x * 255) / w;   // blue
-				GPU.framebuffer[idx + 1] = (x * 255) / w; // green
-				GPU.framebuffer[idx + 2] = (x * 255) / w; // red
-			}
-		}
-	}
 	cprintf("********************************************************************\n");
 
 	// start the kernel command prompt.
@@ -183,11 +186,11 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 void print_welcome_message()
 {
 	cprintf("\n\n\n");
-	cprintf("\t\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-	cprintf("\t\t!!                                                             !!\n");
-	cprintf("\t\t!!                   !! FCIS says HELLO !!                     !!\n");
-	cprintf("\t\t!!                                                             !!\n");
-	cprintf("\t\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("\t!!                                                   !!\n");
+	cprintf("\t!!              !! FCIS says HELLO !!                !!\n");
+	cprintf("\t!!                                                   !!\n");
+	cprintf("\t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 	cprintf("\n\n\n\n");
 }
 
