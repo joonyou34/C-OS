@@ -256,7 +256,9 @@ void command_prompt_readline(const char *prompt, char* buf) {
 			
 		}
 		last_c = c;
-		draw_gui_console();
+        
+        if(GPU_ON)
+		    draw_gui_console();
 	}
 }
 // ******************************************************************
