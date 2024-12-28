@@ -40,8 +40,9 @@ int text_length = 0;
 
 static bool serial_exists;
 
-const uint32 SHIFT_ROW = FONT_SCALE*8;
-const uint32 SHIFT_COL = FONT_SCALE*8;
+#define ROW_PADDING 4
+const uint32 SHIFT_ROW = (FONT_SCALE*8 + FONT_SCALE*ROW_PADDING);
+const uint32 SHIFT_COL = (FONT_SCALE*8);
 
 uint16 max_horizontal_text = 0;
 uint32 max_vertical_text = 0;
@@ -640,8 +641,8 @@ cons_putc(int c)
 void
 cons_init(void)
 {
-	max_horizontal_text = GPU.mode_info->width/(8*FONT_SCALE);
-	max_vertical_text = (GPU.mode_info->height/(8*FONT_SCALE)) - 1;
+	max_horizontal_text = GPU.mode_info->width/(SHIFT_COL);
+	max_vertical_text = (GPU.mode_info->height/(SHIFT_ROW));
 	cga_init();
 	kbd_init();
 	serial_init();

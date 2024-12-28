@@ -108,27 +108,46 @@ strfind(const char *s, char c)
 void *
 memset(void *v, int c, uint32 n)
 {
-	char *p;
-	int m;
+    uint64* p64 = (uint64*)v;
+    if(n >= 8){
+        uint64 data_block = 0;
+        data_block |= data_block << 8;
+        data_block |= data_block << 16;
+        data_block |= data_block << 32;
+        
+        while(n >= 8)
+            *p64++ = data_block, n -= 8;
+    }
 
-	p = v;
-	m = n;
-	while (--m >= 0)
-		*p++ = c;
+    if(n){
+        uint8* p8 = (uint8*)p64;
+        while (n-- > 0)
+            *p8++ = (uint8)c;
+    }
 
-	return v;
+    return v;
 }
 
 void *
 memcpy(void *dst, const void *src, uint32 n)
 {
-	const char *s;
-	char *d;
+    uint64* s64 = (uint64*)src;
+    uint64* d64 = (uint64*)dst;
+    if(n >= 8){
+        while(n >= 8){
+            *d64 = *s64;
+            n -= 8;
+            ++s64;
+            ++d64;
+        }
+    }
 
-	s = src;
-	d = dst;
-	while (n-- > 0)
-		*d++ = *s++;
+    if(n){
+        uint8* s8 = (uint8*)s64;
+        uint8* d8 = (uint8*)d64;
+        while (n-- > 0)
+            *d8++ = *s8++;
+    }
 
 	return dst;
 }
