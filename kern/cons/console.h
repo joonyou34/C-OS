@@ -23,16 +23,15 @@
 #define LEFT_ARROW 228
 #define RIGHT_ARROW 229
 
-#define FONT_SCALE 2
+#define FONT_SCALE 1
 #define CURSOR_SPACING 1
 #define TAB_SPACE 5
-#define GUI_CMD_BUFFER_SIZE 1048576
+#define GUI_CMD_BUFFER_SIZE 32768
 extern const uint32 SHIFT_ROW;
 extern const uint32 SHIFT_COL;
 extern uint32 console_text_color_hex;
 extern uint32 console_bg_color_hex;
 extern uint8 gui_cmd_buffer[GUI_CMD_BUFFER_SIZE];
-extern uint8 tst_buff[GUI_CMD_BUFFER_SIZE];
 
 void draw_gui_console();
 

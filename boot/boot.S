@@ -38,7 +38,7 @@ start:		.code16				# This runs in real mode
 		# initiate video mode switch to switch to mode 0x0118, which is a 24-bit color 1024x768 graphics mode
 		# reference: https://en.wikipedia.org/wiki/VESA_BIOS_Extensions
 		movw	$0x4f02, %ax			# this is the function code for setting the vesa video mode
-        movw	$0x0118, %bx
+        movw	$0x4112, %bx
         int	$0x10						# interrupt 0x10 is the bios interrupt for video mode, reference: https://en.wikipedia.org/wiki/INT_10H
 
 		# in case the mode set was successful, spin
@@ -49,7 +49,7 @@ start:		.code16				# This runs in real mode
 		movw    %cs, %ax           		# the interrupt requires a pointer to the target struct in es:di registers
 		movw    %ax, %es           
 		movw    $0x4f01, %ax       		# this is the function code for retrieving the vesa mode info
-		movw    $0x0118, %cx       
+		movw    $0x0112, %cx       
 		int     $0x10
 
 		# in case the mode info query was successful, spin

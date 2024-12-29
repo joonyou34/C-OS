@@ -304,6 +304,8 @@ void boot_initialize_gpu(struct vbe_mode_info_structure *VESA_mode_info) {
     GPU.mode_info = (struct vbe_mode_info_structure *)(((char *)VESA_mode_info + KERNEL_BASE));
     GPU.framebuffer = (uint8*)(GPU.mode_info->framebuffer + KERNEL_BASE);
 
+    GPU.framebuffer_size = GPU.mode_info->width * GPU.mode_info->height * (GPU.mode_info->bpp>>3);
+
     // initialize the lock for protection since the framebuffer is a shared resource
     init_spinlock(&GPU.lock, "framesuffer");
 
@@ -328,7 +330,17 @@ void krender_window(struct window* win)
             kdraw_pixel_hex(row, col, win->buffer[idx]);
         }
     }
+    kdisplay_backbuffer();
     release_spinlock(&GPU.lock);
+}
+
+// bring the backbuffer to the front (note that the size here is in bytes)
+void kdisplay_backbuffer() {
+    memcpy(GPU.framebuffer, GPU.back_buffer, GPU.framebuffer_size);
+}
+
+void kclear_back_buffer_grayscale(uint8 grayscale_value) {
+    memset(GPU.back_buffer, grayscale_value, GPU.framebuffer_size);
 }
 
 // draws a pixel on the screen with the color "color"
@@ -339,9 +351,9 @@ void kdraw_pixel(uint32 row, uint32 col, color_t color_rgba){
 
     uint32 idx = (row * GPU.mode_info->width + col) * 3;
 
-    GPU.framebuffer[idx] = color_rgba.blue;   // blue
-    GPU.framebuffer[idx + 1] = color_rgba.green; // green
-    GPU.framebuffer[idx + 2] = color_rgba.red; // red
+    GPU.back_buffer[idx] = color_rgba.blue;   // blue
+    GPU.back_buffer[idx + 1] = color_rgba.green; // green
+    GPU.back_buffer[idx + 2] = color_rgba.red; // red
 }
 
 // draws a pixel on the screen with the hex color "color"

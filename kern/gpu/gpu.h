@@ -5,6 +5,8 @@
 #include <inc/color.h>
 #include <kern/conc/channel.h>
 
+#define BACK_BUFFER_SIZE 2359296
+
 extern bool GPU_ON;
 
 // the mode info block struct, reference: https://wiki.osdev.org/VESA_Video_Modes
@@ -47,9 +49,11 @@ struct vbe_mode_info_structure {
 };
 struct gpu
 {
-    struct vbe_mode_info_structure *mode_info; // the vesa mode info block
-    uint8* framebuffer; // the virtual address of the framebuffer
+	uint32 framebuffer_size; //the size of framebuffer in bytes
     struct spinlock lock; // the framebuffer lock
+    uint8* framebuffer; // the virtual address of the framebuffer
+    struct vbe_mode_info_structure *mode_info; // the vesa mode info block
+	uint8 back_buffer[BACK_BUFFER_SIZE]; //back buffer for double buffering
 } GPU;
 
 // Fonts array for text, credits for the font: https://github.com/dhepper/font8x8
@@ -59,6 +63,10 @@ void initialize_gpu(struct vbe_mode_info_structure *VESA_mode_info);
 void boot_initialize_gpu(struct vbe_mode_info_structure *VESA_mode_info);
 
 void krender_window(struct window* win);
+
+void kdisplay_backbuffer();
+
+void kclear_back_buffer_grayscale(uint8 grayscale_value);
 
 void kdraw_pixel(uint32 row,uint32 col, color_t color_rgba); // row, col, color
 void kdraw_pixel_hex(uint32 row,uint32 col ,uint32 color_hex); // row, col, color
