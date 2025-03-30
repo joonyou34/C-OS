@@ -54,7 +54,8 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 
 	{
 		// initalize the boot gpu for the gui console
-		if(VESA_mode_info != 0) {
+		if (VESA_mode_info != 0)
+		{
 			boot_initialize_gpu(VESA_mode_info);
 		}
 		// Initialize the console.
@@ -108,7 +109,7 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 	{
 		initialize_gpu(VESA_mode_info);
 		cprintf("* 2.5) GPU\n");
-		
+
 		// uint32 w = GPU.mode_info->width, h = GPU.mode_info->height;
 		// for (int y = 0; y < h; y++)
 		// {
@@ -148,6 +149,8 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 		// Enable COM1 Interrupt
 		irq_clear_mask(4);
 		cprintf("*	IRQ4 (COM1): is Enabled\n");
+		irq_clear_mask(12);
+		cprintf("*	IRQ12 (Mouse): is Enabled\n");
 		// Enable Primary ATA Hard Disk Interrupt
 		//		irq_clear_mask(14);
 		//		cprintf("*	IRQ14 (Primary ATA Hard Disk): is Enabled\n");

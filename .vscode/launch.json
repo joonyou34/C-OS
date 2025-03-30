@@ -34,8 +34,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "d:/Coding/Projects/Uni/OS/C-OS/lib",
-      "program": "d:/Coding/Projects/Uni/OS/C-OS/lib/build/Debug/outDebug",
+      "cwd": "d:/Coding/Projects/Contributions/C-OS/kern",
+      "program": "d:/Coding/Projects/Contributions/C-OS/kern/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
       "setupCommands": [

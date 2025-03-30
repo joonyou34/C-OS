@@ -13,38 +13,45 @@
 
 #include "console.h"
 
-
 void cons_intr(int (*proc)(void));
 int text_length = 0;
 
 /***** Serial I/O code *****/
 
-#define COM1		0x3F8
+#define COM1 0x3F8
 
-#define COM_RX		0	// In:	Receive buffer (DLAB=0)
-#define COM_DLL		0	// Out: Divisor Latch Low (DLAB=1)
-#define COM_DLM		1	// Out: Divisor Latch High (DLAB=1)
-#define COM_IER		1	// Out: Interrupt Enable Register
-#define   COM_IER_RDI	0x01	//   Enable receiver data interrupt
-#define COM_IIR		2	// In:	Interrupt ID Register
-#define COM_FCR		2	// Out: FIFO Control Register
-#define COM_LCR		3	// Out: Line Control Register
-#define	  COM_LCR_DLAB	0x80	//   Divisor latch access bit
-#define	  COM_LCR_WLEN8	0x03	//   Wordlength: 8 bits
-#define COM_MCR		4	// Out: Modem Control Register
-#define	  COM_MCR_RTS	0x02	// RTS complement
-#define	  COM_MCR_DTR	0x01	// DTR complement
-#define	  COM_MCR_OUT2	0x08	// Out2 complement
-#define COM_LSR		5	// In:	Line Status Register
-#define   COM_LSR_DATA	0x01	//   Data available
+#define COM_RX 0		   // In:	Receive buffer (DLAB=0)
+#define COM_DLL 0		   // Out: Divisor Latch Low (DLAB=1)
+#define COM_DLM 1		   // Out: Divisor Latch High (DLAB=1)
+#define COM_IER 1		   // Out: Interrupt Enable Register
+#define COM_IER_RDI 0x01   //   Enable receiver data interrupt
+#define COM_IIR 2		   // In:	Interrupt ID Register
+#define COM_FCR 2		   // Out: FIFO Control Register
+#define COM_LCR 3		   // Out: Line Control Register
+#define COM_LCR_DLAB 0x80  //   Divisor latch access bit
+#define COM_LCR_WLEN8 0x03 //   Wordlength: 8 bits
+#define COM_MCR 4		   // Out: Modem Control Register
+#define COM_MCR_RTS 0x02   // RTS complement
+#define COM_MCR_DTR 0x01   // DTR complement
+#define COM_MCR_OUT2 0x08  // Out2 complement
+#define COM_LSR 5		   // In:	Line Status Register
+#define COM_LSR_DATA 0x01  //   Data available
 
 static bool serial_exists;
 
 #define ROW_PADDING 4
-#define NEXT(idx) ((idx+1)&(GUI_CMD_BUFFER_SIZE-1))
-#define PREV(idx) ((idx-1)&(GUI_CMD_BUFFER_SIZE-1))
-const uint32 SHIFT_ROW = (FONT_SCALE*8 + ROW_PADDING);
-const uint32 SHIFT_COL = (FONT_SCALE*8);
+#define CURSOR_WIDTH 10
+#define CURSOR_HEIGHT 16
+#define CURSOR_COLOR MAKE_COLOR_HEX(255, 255, 255, 255)
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
+#define NEXT(idx) ((idx + 1) & (GUI_CMD_BUFFER_SIZE - 1))
+#define PREV(idx) ((idx - 1) & (GUI_CMD_BUFFER_SIZE - 1))
+const uint32 SHIFT_ROW = (FONT_SCALE * 8 + ROW_PADDING);
+const uint32 SHIFT_COL = (FONT_SCALE * 8);
+uint8 mouse_packet[3];
+int mouse_byte_count;
+int mouse_x, mouse_y;
 
 uint16 max_horizontal_text = 0;
 uint32 max_vertical_text = 0;
@@ -55,57 +62,51 @@ int gui_buff_st, gui_buff_ed = 0, gui_buff_idx = 0, lst_line_idx = 0;
 uint8 gui_cmd_buffer[GUI_CMD_BUFFER_SIZE];
 struct spinlock cmd_buffer_lock;
 
-int
-serial_proc_data(void)
+int serial_proc_data(void)
 {
-	if (!(inb(COM1+COM_LSR) & COM_LSR_DATA))
+	if (!(inb(COM1 + COM_LSR) & COM_LSR_DATA))
 		return -1;
-	return inb(COM1+COM_RX);
+	return inb(COM1 + COM_RX);
 }
 
-void
-serial_intr(void)
+void serial_intr(void)
 {
 	if (serial_exists)
 		cons_intr(serial_proc_data);
 }
 
-void serial_interrupt_handler(struct Trapframe* tf)
+void serial_interrupt_handler(struct Trapframe *tf)
 {
 	cprintf("\nserial interrupt\n");
 	serial_intr();
 }
 
-void
-serial_init(void)
+void serial_init(void)
 {
 	// Turn off the FIFO
-	outb(COM1+COM_FCR, 0);
+	outb(COM1 + COM_FCR, 0);
 
 	// Set speed; requires DLAB latch
-	outb(COM1+COM_LCR, COM_LCR_DLAB);
-	outb(COM1+COM_DLL, (uint8) (115200 / 9600));
-	outb(COM1+COM_DLM, 0);
+	outb(COM1 + COM_LCR, COM_LCR_DLAB);
+	outb(COM1 + COM_DLL, (uint8)(115200 / 9600));
+	outb(COM1 + COM_DLM, 0);
 
 	// 8 data bits, 1 stop bit, parity off; turn off DLAB latch
-	outb(COM1+COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
+	outb(COM1 + COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
 
 	// No modem controls
-	outb(COM1+COM_MCR, 0);
+	outb(COM1 + COM_MCR, 0);
 	// Enable rcv interrupts
-	outb(COM1+COM_IER, COM_IER_RDI);
+	outb(COM1 + COM_IER, COM_IER_RDI);
 
 	// Clear any preexisting overrun indications and interrupts
 	// Serial port doesn't exist if COM_LSR returns 0xFF
-	serial_exists = (inb(COM1+COM_LSR) != 0xFF);
-	(void) inb(COM1+COM_IIR);
-	(void) inb(COM1+COM_RX);
+	serial_exists = (inb(COM1 + COM_LSR) != 0xFF);
+	(void)inb(COM1 + COM_IIR);
+	(void)inb(COM1 + COM_RX);
 
 	irq_install_handler(4, &serial_interrupt_handler);
-
 }
-
-
 
 /***** Parallel port output code *****/
 // For information on PC parallel port programming, see the class References
@@ -126,15 +127,12 @@ lpt_putc(int c)
 {
 	int i;
 
-	for (i = 0; !(inb(0x378+1) & 0x80) && i < 2800; i++) //12800
+	for (i = 0; !(inb(0x378 + 1) & 0x80) && i < 2800; i++) // 12800
 		delay();
-	outb(0x378+0, c);
-	outb(0x378+2, 0x08|0x04|0x01);
-	outb(0x378+2, 0x08);
+	outb(0x378 + 0, c);
+	outb(0x378 + 2, 0x08 | 0x04 | 0x01);
+	outb(0x378 + 2, 0x08);
 }
-
-
-
 
 /***** Text-mode CGA/VGA display output *****/
 
@@ -142,20 +140,22 @@ static unsigned addr_6845;
 static uint16 *crt_buf;
 static uint16 crt_pos;
 
-void
-cga_init(void)
+void cga_init(void)
 {
 	volatile uint16 *cp;
 	uint16 was;
 	unsigned pos;
 
-	cp = (uint16*) (KERNEL_BASE + CGA_BUF);
+	cp = (uint16 *)(KERNEL_BASE + CGA_BUF);
 	was = *cp;
-	*cp = (uint16) 0xA55A;
-	if (*cp != 0xA55A) {
-		cp = (uint16*) (KERNEL_BASE + MONO_BUF);
+	*cp = (uint16)0xA55A;
+	if (*cp != 0xA55A)
+	{
+		cp = (uint16 *)(KERNEL_BASE + MONO_BUF);
 		addr_6845 = MONO_BASE;
-	} else {
+	}
+	else
+	{
 		*cp = was;
 		addr_6845 = CGA_BASE;
 	}
@@ -166,23 +166,24 @@ cga_init(void)
 	outb(addr_6845, 15);
 	pos |= inb(addr_6845 + 1);
 
-	crt_buf = (uint16*) cp;
+	crt_buf = (uint16 *)cp;
 	crt_pos = pos;
 }
 
-//2016: Preliminary backward and forward cursor movement was added to FOS
-// 		Thanks to student Abdullah Mohammad Ma3en, 3rd year, and TA Ghada Hamed.
+// 2016: Preliminary backward and forward cursor movement was added to FOS
+//  		Thanks to student Abdullah Mohammad Ma3en, 3rd year, and TA Ghada Hamed.
 
-void
-cga_putc(int c)
+void cga_putc(int c)
 {
 	// if no attribute given, then use black on white
 	if (!(c & ~0xFF))
 		c |= 0x0700;
 
-	switch (c & 0xff) {
+	switch (c & 0xff)
+	{
 	case '\b':
-		if (crt_pos > 0) {
+		if (crt_pos > 0)
+		{
 			crt_pos--;
 			crt_buf[crt_pos] = (c & ~0xff) | ' ';
 		}
@@ -194,22 +195,25 @@ cga_putc(int c)
 	case '\r':
 		crt_pos -= (crt_pos % CRT_COLS);
 		break;
-	case '\t': {
-		for(int i = 0; i < TAB_SPACE; i++)
+	case '\t':
+	{
+		for (int i = 0; i < TAB_SPACE; i++)
 			cons_putc(' ');
 		break;
 	}
 	case LEFT_ARROW:
-		if(crt_pos>0)
+		if (crt_pos > 0)
 			crt_pos--;
 		break;
 	case RIGHT_ARROW:
 		if (crt_pos < CRT_SIZE)
 			crt_pos++;
 		break;
-	default: {
-		if (c != KEY_LF && c != KEY_RT) {
-			crt_buf[crt_pos++] = c;		/* write the character */
+	default:
+	{
+		if (c != KEY_LF && c != KEY_RT)
+		{
+			crt_buf[crt_pos++] = c; /* write the character */
 			if (crt_pos > 1920 + text_length)
 				text_length++;
 		}
@@ -218,7 +222,8 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
-	if (crt_pos >= CRT_SIZE) {
+	if (crt_pos >= CRT_SIZE)
+	{
 		int i;
 
 		memcpy(crt_buf, crt_buf + CRT_COLS, (CRT_SIZE - CRT_COLS) * sizeof(uint16));
@@ -234,86 +239,73 @@ cga_putc(int c)
 	outb(addr_6845 + 1, crt_pos);
 }
 
-
 /***** Keyboard input code *****/
 
-#define NO		0
+#define NO 0
 
-#define SHIFT		(1<<0)
-#define CTL		(1<<1)
-#define ALT		(1<<2)
+#define SHIFT (1 << 0)
+#define CTL (1 << 1)
+#define ALT (1 << 2)
 
-#define CAPSLOCK	(1<<3)
-#define NUMLOCK		(1<<4)
-#define SCROLLLOCK	(1<<5)
+#define CAPSLOCK (1 << 3)
+#define NUMLOCK (1 << 4)
+#define SCROLLLOCK (1 << 5)
 
-#define E0ESC		(1<<6)
+#define E0ESC (1 << 6)
 
-static uint8 shiftcode[256] = { [0x1D] CTL, [0x2A] SHIFT, [0x36] SHIFT, [0x38
-																		 ] ALT, [0x9D] CTL, [0xB8] ALT };
+static uint8 shiftcode[256] = {[0x1D] CTL, [0x2A] SHIFT, [0x36] SHIFT, [0x38] ALT, [0x9D] CTL, [0xB8] ALT};
 
-static uint8 togglecode[256] = { [0x3A] CAPSLOCK, [0x45] NUMLOCK, [0x46
-																   ] SCROLLLOCK };
+static uint8 togglecode[256] = {[0x3A] CAPSLOCK, [0x45] NUMLOCK, [0x46] SCROLLLOCK};
 
 static uint8 normalmap[256] = {
-		NO, 0x1B, '1', '2', '3', '4', '5',
-		'6',	// 0x00
-		'7', '8', '9', '0', '-', '=', '\b', '\t', 'q', 'w', 'e', 'r', 't', 'y',
-		'u',
-		'i',	// 0x10
-		'o', 'p', '[', ']', '\n', NO, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
-		'l',
-		';',	// 0x20
-		'\'', '`', NO, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',
-		NO,
-		'*',	// 0x30
-		NO,   ' ',  NO,   NO,   NO,   NO,   NO,   NO,
-		NO, NO, NO, NO, NO, NO, NO,
-		'7',	// 0x40
-		'8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0', '.', NO, NO, NO,
-		NO,	// 0x50
-		[0x97] KEY_HOME, [0x9C] '\n' /*KP_Enter*/, [0xB5] '/' /*KP_Div*/, [0xC8
-																		   ] KEY_UP, [0xC9] KEY_PGUP, [0xCB] KEY_LF, [0xCD] KEY_RT, [0xCF
-																																	 ] KEY_END, [0xD0] KEY_DN, [0xD1] KEY_PGDN, [0xD2] KEY_INS, [0xD3
-																																																 ] KEY_DEL };
+	NO, 0x1B, '1', '2', '3', '4', '5',
+	'6', // 0x00
+	'7', '8', '9', '0', '-', '=', '\b', '\t', 'q', 'w', 'e', 'r', 't', 'y',
+	'u',
+	'i', // 0x10
+	'o', 'p', '[', ']', '\n', NO, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
+	'l',
+	';', // 0x20
+	'\'', '`', NO, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',
+	NO,
+	'*', // 0x30
+	NO, ' ', NO, NO, NO, NO, NO, NO,
+	NO, NO, NO, NO, NO, NO, NO,
+	'7', // 0x40
+	'8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0', '.', NO, NO, NO,
+	NO, // 0x50
+	[0x97] KEY_HOME, [0x9C] '\n' /*KP_Enter*/, [0xB5] '/' /*KP_Div*/, [0xC8] KEY_UP, [0xC9] KEY_PGUP, [0xCB] KEY_LF, [0xCD] KEY_RT, [0xCF] KEY_END, [0xD0] KEY_DN, [0xD1] KEY_PGDN, [0xD2] KEY_INS, [0xD3] KEY_DEL};
 
 static uint8 shiftmap[256] = {
-		NO, 033, '!', '@', '#', '$', '%',
-		'^',	// 0x00
-		'&', '*', '(', ')', '_', '+', '\b', '\t', 'Q', 'W', 'E', 'R', 'T', 'Y',
-		'U',
-		'I',	// 0x10
-		'O', 'P', '{', '}', '\n', NO, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
-		'L',
-		':',	// 0x20
-		'"', '~', NO, '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', NO,
-		'*',	// 0x30
-		NO,   ' ',  NO,   NO,   NO,   NO,   NO,   NO,
-		NO, NO, NO, NO, NO, NO, NO,
-		'7',	// 0x40
-		'8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0', '.', NO, NO, NO,
-		NO,	// 0x50
-		[0x97] KEY_HOME, [0x9C] '\n' /*KP_Enter*/, [0xB5] '/' /*KP_Div*/, [0xC8
-																		   ] KEY_UP, [0xC9] KEY_PGUP, [0xCB] KEY_LF, [0xCD] KEY_RT, [0xCF
-																																	 ] KEY_END, [0xD0] KEY_DN, [0xD1] KEY_PGDN, [0xD2] KEY_INS, [0xD3
-																																																 ] KEY_DEL };
+	NO, 033, '!', '@', '#', '$', '%',
+	'^', // 0x00
+	'&', '*', '(', ')', '_', '+', '\b', '\t', 'Q', 'W', 'E', 'R', 'T', 'Y',
+	'U',
+	'I', // 0x10
+	'O', 'P', '{', '}', '\n', NO, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
+	'L',
+	':', // 0x20
+	'"', '~', NO, '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', NO,
+	'*', // 0x30
+	NO, ' ', NO, NO, NO, NO, NO, NO,
+	NO, NO, NO, NO, NO, NO, NO,
+	'7', // 0x40
+	'8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0', '.', NO, NO, NO,
+	NO, // 0x50
+	[0x97] KEY_HOME, [0x9C] '\n' /*KP_Enter*/, [0xB5] '/' /*KP_Div*/, [0xC8] KEY_UP, [0xC9] KEY_PGUP, [0xCB] KEY_LF, [0xCD] KEY_RT, [0xCF] KEY_END, [0xD0] KEY_DN, [0xD1] KEY_PGDN, [0xD2] KEY_INS, [0xD3] KEY_DEL};
 
 #define C(x) (x - '@')
 #define KEY_SPACE 0xFF
 
 static uint8 ctlmap[256] = {
-		NO,      NO,      NO,      NO,      NO,      NO,      NO,      NO,
-		NO, NO, NO, NO, NO, NO, NO, NO, C('Q'), C('W'), C('E'), C('R'), C('T'), C('Y'),
-		C('U'), C('I'), C('O'), C('P'), NO, NO, '\r', NO, C('A'), C('S'), C(
-				'D'), C('F'), C('G'), C('H'), C('J'), C('K'), C('L'), NO,
-				NO, NO, NO, C('\\'), C('Z'), C('X'), C('C'), C('V'), C('B'), C('N'), C(
-						'M'), NO, NO, C('/'), NO, NO, [0x39] KEY_SPACE, /*space*/
-						[0x9D] NO, /*right Ctrl*/
-						[0x97] KEY_HOME, [0xB5] C('/'), [0xC8] KEY_UP, [0xC9] KEY_PGUP, [0xCB
-																						 ] KEY_LF, [0xCD] KEY_RT, [0xCF] KEY_END, [0xD0] KEY_DN, [0xD1
-																																				  ] KEY_PGDN, [0xD2] KEY_INS, [0xD3] KEY_DEL };
+	NO, NO, NO, NO, NO, NO, NO, NO,
+	NO, NO, NO, NO, NO, NO, NO, NO, C('Q'), C('W'), C('E'), C('R'), C('T'), C('Y'),
+	C('U'), C('I'), C('O'), C('P'), NO, NO, '\r', NO, C('A'), C('S'), C('D'), C('F'), C('G'), C('H'), C('J'), C('K'), C('L'), NO,
+	NO, NO, NO, C('\\'), C('Z'), C('X'), C('C'), C('V'), C('B'), C('N'), C('M'), NO, NO, C('/'), NO, NO, [0x39] KEY_SPACE, /*space*/
+	[0x9D] NO,																											   /*right Ctrl*/
+	[0x97] KEY_HOME, [0xB5] C('/'), [0xC8] KEY_UP, [0xC9] KEY_PGUP, [0xCB] KEY_LF, [0xCD] KEY_RT, [0xCF] KEY_END, [0xD0] KEY_DN, [0xD1] KEY_PGDN, [0xD2] KEY_INS, [0xD3] KEY_DEL};
 
-static uint8 *charcode[4] = { normalmap, shiftmap, ctlmap, ctlmap };
+static uint8 *charcode[4] = {normalmap, shiftmap, ctlmap, ctlmap};
 
 /*
  * Get data from the keyboard.  If we finish a character, return it.  Else 0.
@@ -323,24 +315,64 @@ static int
 kbd_proc_data(void)
 {
 	int c;
-	uint8 data;
 	static uint32 shift;
-
-	if ((inb(KBSTATP) & KBS_DIB) == 0)
+	uint8 status = inb(KBSTATP);
+	if (status & 0x20)
+	{
+		uint8 mouse_data = inb(KBDATAP);
+		mouse_packet[mouse_byte_count++] = mouse_data;
+		if (mouse_byte_count == 3) {
+			bool leftButton   = mouse_packet[0] & 0x01;
+			bool rightButton  = mouse_packet[0] & 0x02;
+			bool middleButton = mouse_packet[0] & 0x04;
+			int deltaX = (int8)mouse_packet[1];
+			int deltaY = (int8)mouse_packet[2];
+			cprintf("Mouse packet: [%x %x %x] L:%d R:%d M:%d dX:%d dY:%d\n",
+					mouse_packet[0], mouse_packet[1], mouse_packet[2],
+					leftButton, rightButton, middleButton, deltaX, deltaY);
+			mouse_byte_count = 0;
+		
+			// Update mouse coordinates.
+			// Adjust scaling if needed (e.g., multiply deltaX/deltaY by a factor)
+			mouse_x += deltaX;
+			mouse_y -= deltaY;  // Note: Y is often inverted
+		
+			// Clamp the mouse position to the screen boundaries.
+			if (mouse_x < 0)
+				mouse_x = 0;
+			else if (mouse_x >= SCREEN_WIDTH)
+				mouse_x = SCREEN_WIDTH - 1;
+		
+			if (mouse_y < 0)
+				mouse_y = 0;
+			else if (mouse_y >= SCREEN_HEIGHT)
+				mouse_y = SCREEN_HEIGHT - 1;
+		}
+		
 		return -1;
+	}
+	if ((status & KBS_DIB) == 0)
+		return -1;
+
+	uint8 data = inb(KBDATAP);
 
 	data = inb(KBDATAP);
 
-	if (data == 0xE0) {
+	if (data == 0xE0)
+	{
 		// E0 escape character
 		shift |= E0ESC;
 		return 0;
-	} else if (data & 0x80) {
+	}
+	else if (data & 0x80)
+	{
 		// Key released
 		data = (shift & E0ESC ? data : data & 0x7F);
 		shift &= ~(shiftcode[data] | E0ESC);
 		return 0;
-	} else if (shift & E0ESC) {
+	}
+	else if (shift & E0ESC)
+	{
 		// Last character was an E0 escape; or with 0x80
 		data |= 0x80;
 		shift &= ~E0ESC;
@@ -350,15 +382,19 @@ kbd_proc_data(void)
 	shift ^= togglecode[data];
 
 	c = charcode[shift & (CTL | SHIFT)][data];
-	if (c == KEY_DEL) {
-		if (text_length > 0) {
+	if (c == KEY_DEL)
+	{
+		if (text_length > 0)
+		{
 			if (crt_pos == 1920 + text_length)
 				return 0;
-			else {
+			else
+			{
 				text_length--;
 				int crt_pos_Length = crt_pos - 1925;
 				for (int i = crt_pos; crt_pos_Length <= text_length;
-						++i, crt_pos_Length++) {
+					 ++i, crt_pos_Length++)
+				{
 					crt_buf[i] = crt_buf[i + 1];
 				}
 				return c;
@@ -366,7 +402,8 @@ kbd_proc_data(void)
 		}
 		return 0;
 	}
-	if (shift & CAPSLOCK) {
+	if (shift & CAPSLOCK)
+	{
 		if ('a' <= c && c <= 'z')
 			c += 'A' - 'a';
 		else if ('A' <= c && c <= 'Z')
@@ -374,12 +411,13 @@ kbd_proc_data(void)
 	}
 
 	// Process special keys
-	if ((int) shift == NUMLOCK && c >= '0' && c <= '9')
+	if ((int)shift == NUMLOCK && c >= '0' && c <= '9')
 		return 0;
 	if (c == 255)
 		return 0;
 	// Ctrl-Alt-Del: reboot
-	if (!(~shift & (CTL | ALT)) && c == KEY_DEL) {
+	if (!(~shift & (CTL | ALT)) && c == KEY_DEL)
+	{
 		cprintf("Rebooting!\n");
 		outb(0x92, 0x3); // courtesy of Chris Frost
 	}
@@ -387,14 +425,109 @@ kbd_proc_data(void)
 	return c;
 }
 
-void
-kbd_intr(void)
+void kbd_intr(void)
 {
 	cons_intr(kbd_proc_data);
 }
 
-void
-kbd_init(void)
+
+// Wait until the input buffer (bit1 of port 0x64) is clear
+static void waitInputBufferClear(void)
+{
+    uint32 timeout = 100000;
+    while (inb(0x64) & 0x02)
+        if (--timeout == 0)
+            break;
+}
+
+// Wait until the output buffer (bit0 of port 0x64) is full
+static void waitOutputBufferFull(void)
+{
+    uint32 timeout = 100000;
+    while (!(inb(0x64) & 0x01))
+        if (--timeout == 0)
+            break;
+}
+
+// Wait for an ACK (0xFA) from the mouse
+static void waitMouseAck(void)
+{
+    waitOutputBufferFull();
+    uint8 ack = inb(0x60);
+    if (ack != 0xFA)
+        cprintf("Mouse did not ACK command: 0x%x\n", ack);
+    else
+        cprintf("ACK received\n");
+}
+
+// Flush data from port 0x60
+static void flushOutputBuffer(void)
+{
+    while (inb(0x64) & 0x01)
+        inb(0x60);
+}
+
+void mouse_init(void)
+{
+    cprintf("Initializing PS/2 mouse...\n");
+    flushOutputBuffer();
+
+    // --- Step 1: Enable the Auxiliary (Mouse) Port ---
+    waitInputBufferClear();
+    outb(0x64, 0x20); // Read Command Byte
+    waitOutputBufferFull();
+    uint8 status = inb(0x60);
+    status |= 0x02;  // Enable IRQ12 for the mouse.
+    status &= ~0x20; // Ensure mouse clock is enabled.
+    waitInputBufferClear();
+    outb(0x64, 0x60); // Write Command Byte
+    waitInputBufferClear();
+    outb(0x60, status);
+    waitInputBufferClear();
+    outb(0x64, 0xA8); // Enable auxiliary device (mouse).
+
+    // --- Step 2: Initialize the Mouse ---
+    flushOutputBuffer();
+
+    // Reset the mouse:
+    waitInputBufferClear();
+    outb(0x64, 0xD4); // Next byte is for mouse.
+    waitInputBufferClear();
+    outb(0x60, 0xFF); // Reset command.
+    // Wait for ACK (0xFA) then self-test pass code (0xAA)
+    waitOutputBufferFull();
+    uint8 ack = inb(0x60);
+    if (ack != 0xFA)
+        cprintf("Mouse did not ACK reset command: 0x%x\n", ack);
+    waitOutputBufferFull();
+    uint8 self_test = inb(0x60);
+    if (self_test != 0xAA)
+        cprintf("Mouse self-test failed: 0x%x\n", self_test);
+
+    flushOutputBuffer();
+
+    // Set default settings (0xF6):
+    waitInputBufferClear();
+    outb(0x64, 0xD4);
+    waitInputBufferClear();
+    outb(0x60, 0xF6);
+    waitMouseAck();
+
+    // Enable packet streaming (0xF4):
+    waitInputBufferClear();
+    outb(0x64, 0xD4);
+    waitInputBufferClear();
+    outb(0x60, 0xF4);
+    waitMouseAck();
+    // Set initial mouse position.
+	mouse_x = SCREEN_WIDTH / 2;
+    mouse_y = SCREEN_HEIGHT / 2;
+
+    cprintf("Mouse initialization complete.\n");
+}
+
+
+void kbd_init(void)
 {
 	irq_install_handler(1, &keyboard_interrupt_handler);
 	if (KBD_INT_BLK_METHOD == LCK_SLEEP)
@@ -408,8 +541,6 @@ kbd_init(void)
 	}
 }
 
-
-
 /***** General device-independent console code *****/
 // Here we manage the console input buffer,
 // where we stash characters received from the keyboard or serial port
@@ -417,7 +548,8 @@ kbd_init(void)
 
 #define CONSBUFSIZE 512
 
-static struct {
+static struct
+{
 	uint8 buf[CONSBUFSIZE];
 	uint32 rpos;
 	uint32 wpos;
@@ -425,25 +557,23 @@ static struct {
 
 // called by device interrupt routines to feed input characters
 // into the circular console input buffer.
-void
-cons_intr(int (*proc)(void))
+void cons_intr(int (*proc)(void))
 {
 	int c;
 
-	while ((c = (*proc)()) != -1) {
+	while ((c = (*proc)()) != -1)
+	{
 		if (c == 0)
 			continue;
 		cons.buf[cons.wpos++] = c;
 		if (cons.wpos == CONSBUFSIZE)
 			cons.wpos = 0;
-
-		//cprintf("\nCHAR %d is written into cons.buf\n", c);
+		// cprintf("\nCHAR %d is written into cons.buf\n", c);
 	}
 }
 
 // return the next input character from the console, or 0 if none waiting
-int
-cons_getc(void)
+int cons_getc(void)
 {
 	int c;
 
@@ -454,7 +584,8 @@ cons_getc(void)
 	kbd_intr();
 
 	// grab the next character from the input buffer.
-	if (cons.rpos != cons.wpos) {
+	if (cons.rpos != cons.wpos)
+	{
 		c = cons.buf[cons.rpos++];
 		if (cons.rpos == CONSBUFSIZE)
 			cons.rpos = 0;
@@ -464,12 +595,12 @@ cons_getc(void)
 }
 
 //// return the next input character from the console buffer, or 0 if none
-int
-cons_getc2(void)
+int cons_getc2(void)
 {
 	int c;
 	// grab the next character from the input buffer (if any).
-	if (cons.rpos != cons.wpos) {
+	if (cons.rpos != cons.wpos)
+	{
 		c = cons.buf[cons.rpos++];
 		if (cons.rpos == CONSBUFSIZE)
 			cons.rpos = 0;
@@ -478,80 +609,104 @@ cons_getc2(void)
 	return 0;
 }
 
-
 #define ABS(a) ((a < 0) ? -a : a)
-#define CYCLIC_SIZE(start, end) (((end-start)&(GUI_CMD_BUFFER_SIZE-1))+1)
+#define CYCLIC_SIZE(start, end) (((end - start) & (GUI_CMD_BUFFER_SIZE - 1)) + 1)
 
-void inc_gui_buffer() {
-	if(CYCLIC_SIZE(gui_buff_st, gui_buff_ed) == GUI_CMD_BUFFER_SIZE)
+void inc_gui_buffer()
+{
+	if (CYCLIC_SIZE(gui_buff_st, gui_buff_ed) == GUI_CMD_BUFFER_SIZE)
 		gui_buff_st = NEXT(gui_buff_st);
-	gui_buff_ed = NEXT(gui_buff_ed); 
+	gui_buff_ed = NEXT(gui_buff_ed);
 }
 
-bool move_left() {
-	if(gui_buff_idx != gui_buff_st) {
+bool move_left()
+{
+	if (gui_buff_idx != gui_buff_st)
+	{
 		gui_buff_idx = PREV(gui_buff_idx);
 		return 1;
 	}
 	return 0;
 }
 
-void gpu_putc(int c) {
+void gpu_putc(int c)
+{
 	acquire_spinlock(&cmd_buffer_lock);
-	if(c == '\t') {
+	if (c == '\t')
+	{
 		release_spinlock(&cmd_buffer_lock);
 		return;
 	}
 
-	switch(c) {
-		case '\r':
-			gui_buff_idx = lst_line_idx;
-			break;
-		case '\b': {
-			uint32 cur_idx = gui_buff_idx;
-			if(move_left()) {
-				gui_cmd_buffer[gui_buff_idx] = ' ';
-				if(cur_idx == gui_buff_ed)
-					gui_buff_ed = PREV(gui_buff_ed);
-			}
-			break;
+	switch (c)
+	{
+	case '\r':
+		gui_buff_idx = lst_line_idx;
+		break;
+	case '\b':
+	{
+		uint32 cur_idx = gui_buff_idx;
+		if (move_left())
+		{
+			gui_cmd_buffer[gui_buff_idx] = ' ';
+			if (cur_idx == gui_buff_ed)
+				gui_buff_ed = PREV(gui_buff_ed);
 		}
-		case LEFT_ARROW:
-			move_left();
-			break;
-		case RIGHT_ARROW:
-			if(gui_buff_idx != gui_buff_ed)
-				gui_buff_idx = NEXT(gui_buff_idx);
-			break;
-		case '\n':
-			lst_line_idx = NEXT(gui_buff_idx);
-		default:
-			gui_cmd_buffer[gui_buff_idx] = c;
-			if(gui_buff_idx == gui_buff_ed)
-				inc_gui_buffer();
-			gui_buff_idx = NEXT(gui_buff_idx);
+		break;
 	}
-	
+	case LEFT_ARROW:
+		move_left();
+		break;
+	case RIGHT_ARROW:
+		if (gui_buff_idx != gui_buff_ed)
+			gui_buff_idx = NEXT(gui_buff_idx);
+		break;
+	case '\n':
+		lst_line_idx = NEXT(gui_buff_idx);
+	default:
+		gui_cmd_buffer[gui_buff_idx] = c;
+		if (gui_buff_idx == gui_buff_ed)
+			inc_gui_buffer();
+		gui_buff_idx = NEXT(gui_buff_idx);
+	}
+
 	release_spinlock(&cmd_buffer_lock);
-	return; 
+	return;
+}
+
+void draw_mouse_cursor(void)
+{
+    for (int y = 0; y < CURSOR_HEIGHT; y++) {
+        for (int x = 0; x < CURSOR_WIDTH; x++) {
+            if (x == y / 2) {
+                kdraw_pixel_hex(mouse_y + y, mouse_x + x, CURSOR_COLOR);
+            }
+        }
+    }
 }
 
 
-void draw_gui_console() {
+void draw_gui_console()
+{
 	acquire_spinlock(&cmd_buffer_lock);
 	acquire_spinlock(&GPU.lock);
 	kclear_back_buffer_grayscale(0);
+	draw_mouse_cursor();
 	int st;
 	uint32 row_ct = 0, col_ct = 0;
-	for(st = gui_buff_ed; st != gui_buff_st; st = PREV(st)) {
+	for (st = gui_buff_ed; st != gui_buff_st; st = PREV(st))
+	{
 		col_ct++;
-		if(gui_cmd_buffer[st] == '\n') {
+		if (gui_cmd_buffer[st] == '\n')
+		{
 			row_ct++, col_ct = 0;
 		}
-		if(col_ct == max_horizontal_text) {
+		if (col_ct == max_horizontal_text)
+		{
 			row_ct++, col_ct = 1;
 		}
-		if(row_ct == max_vertical_text) {
+		if (row_ct == max_vertical_text)
+		{
 			st = NEXT(st);
 			break;
 		}
@@ -561,41 +716,50 @@ void draw_gui_console() {
 	uint32 ed;
 	uint8 chr_msk;
 	uint32 bef_ed = PREV(gui_buff_ed);
-	while(st != gui_buff_ed) {
+	while (st != gui_buff_ed)
+	{
 		col_ct = 0;
-		for(ed = st; ed != bef_ed; ed = NEXT(ed)) {
-			if(ed == gui_buff_idx) {
-				kdraw_char_hex(row_ct + CURSOR_SPACING*FONT_SCALE, col_ct*SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
+		for (ed = st; ed != bef_ed; ed = NEXT(ed))
+		{
+			if (ed == gui_buff_idx)
+			{
+				kdraw_char_hex(row_ct + CURSOR_SPACING * FONT_SCALE, col_ct * SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
 			}
 			col_ct++;
-			if(col_ct == max_horizontal_text || gui_cmd_buffer[ed] == '\n')
+			if (col_ct == max_horizontal_text || gui_cmd_buffer[ed] == '\n')
 				break;
 		}
-		if(ed == bef_ed && ed == gui_buff_idx) {
-			kdraw_char_hex(row_ct + CURSOR_SPACING*FONT_SCALE, col_ct*SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
+		if (ed == bef_ed && ed == gui_buff_idx)
+		{
+			kdraw_char_hex(row_ct + CURSOR_SPACING * FONT_SCALE, col_ct * SHIFT_COL, '_', FONT_SCALE, console_text_color_hex, 0);
 		}
 
 		ed = NEXT(ed);
-		for(int row_off = 0; row_off < 8; ++row_off) {
-			for(int row_scale = 0; row_scale < FONT_SCALE; ++row_scale, ++row_ct) {
+		for (int row_off = 0; row_off < 8; ++row_off)
+		{
+			for (int row_scale = 0; row_scale < FONT_SCALE; ++row_scale, ++row_ct)
+			{
 				col_ct = 0;
-				for(int chr_idx = st; chr_idx != ed; chr_idx = NEXT(chr_idx), col_ct += SHIFT_COL) {
+				for (int chr_idx = st; chr_idx != ed; chr_idx = NEXT(chr_idx), col_ct += SHIFT_COL)
+				{
 					chr_msk = font_data[gui_cmd_buffer[chr_idx]][row_off];
 					uint32 col_scale = 0;
-					for(int col = 0; col < 8; col++, col_scale += FONT_SCALE) {
-						if(chr_msk&(1<<col)) {
-							for(int scale_offset = 0; scale_offset < FONT_SCALE; ++scale_offset)
+					for (int col = 0; col < 8; col++, col_scale += FONT_SCALE)
+					{
+						if (chr_msk & (1 << col))
+						{
+							for (int scale_offset = 0; scale_offset < FONT_SCALE; ++scale_offset)
 								kdraw_pixel_hex(row_ct, col_ct + col_scale + scale_offset, console_text_color_hex);
-						} 
-					} 
+						}
+					}
 				}
 			}
 		}
 		row_ct += ROW_PADDING;
 		st = ed;
 	}
-	if(st == gui_buff_idx)
-		kdraw_char_hex(row_ct + CURSOR_SPACING*FONT_SCALE - SHIFT_ROW, col_ct, '_', FONT_SCALE, console_text_color_hex, 0);
+	if (st == gui_buff_idx)
+		kdraw_char_hex(row_ct + CURSOR_SPACING * FONT_SCALE - SHIFT_ROW, col_ct, '_', FONT_SCALE, console_text_color_hex, 0);
 	// for(; st != gui_buff_ed; st = NEXT(st)) {
 	// 	uint8 c = gui_cmd_buffer[st];
 	// 	if(c == '\n') {
@@ -617,25 +781,25 @@ void draw_gui_console() {
 }
 
 // output a character to the console
-void
-cons_putc(int c)
+void cons_putc(int c)
 {
 	cga_putc(c);
 	lpt_putc(c);
-	if(GPU_ON) {
+	if (GPU_ON)
+	{
 		gpu_putc(c);
 	}
 }
 
 // initialize the console devices
-void
-cons_init(void)
+void cons_init(void)
 {
 	init_spinlock(&cmd_buffer_lock, "cmd buffer lock");
-	max_horizontal_text = GPU.mode_info->width/(SHIFT_COL);
-	max_vertical_text = (GPU.mode_info->height/(SHIFT_ROW));
+	max_horizontal_text = GPU.mode_info->width / (SHIFT_COL);
+	max_vertical_text = (GPU.mode_info->height / (SHIFT_ROW));
 	cga_init();
 	kbd_init();
+	mouse_init();
 	serial_init();
 
 	if (!serial_exists)
@@ -651,17 +815,14 @@ cons_init(void)
 	}
 }
 
-
 // `High'-level console I/O.  Used by readline and cprintf from KERNEL side
 
-void
-cputchar(int c)
+void cputchar(int c)
 {
 	cons_putc(c);
 }
 
-int
-getchar(void)
+int getchar(void)
 {
 	int c;
 
@@ -670,8 +831,7 @@ getchar(void)
 	return c;
 }
 
-int
-iscons(int fdnum)
+int iscons(int fdnum)
 {
 	// used by readline
 	return 1;
@@ -684,13 +844,13 @@ void keyboard_interrupt_handler()
 	//	char press = inb(0x60) & 0x80; //Press down, or released
 	//
 	//	cprintf("Scan code: %d, Press: %d\n", scanCode, press);
-	//cprintf("char is pressed\n");
+	// cprintf("char is pressed\n");
 	kbd_intr();
 
-	//If there's a received char in the cons.buf, wakeup a waiting process (if any)
+	// If there's a received char in the cons.buf, wakeup a waiting process (if any)
 	if (cons.rpos != cons.wpos)
 	{
-		//cprintf("\n*******keyboard interrupt: will wakeup one process******\n");
+		// cprintf("\n*******keyboard interrupt: will wakeup one process******\n");
 		if (KBD_INT_BLK_METHOD == LCK_SLEEP)
 		{
 			wakeup_one(&KBDchannel);
@@ -708,13 +868,13 @@ void cons_lock(void)
 	{
 		kclock_stop();
 		cli();
-		struct Env * p = get_cpu_proc();
+		struct Env *p = get_cpu_proc();
 		if (p == NULL)
 		{
 			panic("cons_lock: no running process to block");
 		}
-		p->env_tf->tf_eflags &= ~FL_IF ;
-		//cprintf("\nconsole will be LOCKED\n");
+		p->env_tf->tf_eflags &= ~FL_IF;
+		// cprintf("\nconsole will be LOCKED\n");
 	}
 	else if (CONS_LCK_METHOD == LCK_SLEEP)
 	{
@@ -724,7 +884,6 @@ void cons_lock(void)
 	{
 		wait_ksemaphore(&conssem);
 	}
-
 }
 
 void cons_unlock(void)
@@ -733,13 +892,13 @@ void cons_unlock(void)
 	{
 		kclock_stop();
 		cli();
-		struct Env * p = get_cpu_proc();
+		struct Env *p = get_cpu_proc();
 		if (p == NULL)
 		{
 			panic("cons_unlock: no running process to block");
 		}
-		p->env_tf->tf_eflags |= FL_IF ;
-		//cprintf("\nconsole will be UN-LOCKED\n");
+		p->env_tf->tf_eflags |= FL_IF;
+		// cprintf("\nconsole will be UN-LOCKED\n");
 	}
 	else if (CONS_LCK_METHOD == LCK_SLEEP)
 	{
@@ -749,5 +908,4 @@ void cons_unlock(void)
 	{
 		signal_ksemaphore(&conssem);
 	}
-
 }

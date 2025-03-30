@@ -135,6 +135,7 @@ void idt_init(void)
 	SETGATE(idt[T_PGFLT   ], 0, GD_KT , &PAGE_FAULT, 0) ;		//14
 	SETGATE(idt[IRQ0_Clock], 0, GD_KT , &IRQ0_CLK_HANDLER, 3) ;	//32
 	SETGATE(idt[IRQ1_KB	  ], 0, GD_KT , &IRQ1_KBD_HANDLER, 3) ;	//33
+
 	SETGATE(idt[T_SYSCALL ], 0, GD_KT , &SYSCALL_HANDLER, 3) ;	//48
 
 	//S/W Exceptions
@@ -339,8 +340,6 @@ void trap(struct Trapframe *tf)
 	//	if (tf->tf_trapno == T_SYSCALL)
 	//	{
 	//		cprintf("System Call #%d\n", tf->tf_regs.reg_eax);
-	//	}
-	//[3] Handle the incoming trap/interrupt
 	if (tf->tf_trapno >= IRQ_OFFSET && tf->tf_trapno < IRQ_OFFSET + MAX_IRQS)
 	{
 		irq_dispatch(tf);
@@ -364,4 +363,3 @@ void trap(struct Trapframe *tf)
 	//	cprintf("\nclock is resumed with counter = %d.\n", kclock_read_cnt0_latch());
 	//	cprintf("[tf] tf @%x - tf.cs = %x - tf.eip = %x - tf.eax = %d\n", tf, tf->tf_cs,tf->tf_eip, tf->tf_regs.reg_eax );
 }
-

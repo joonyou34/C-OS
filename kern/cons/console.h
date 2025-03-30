@@ -33,6 +33,7 @@ extern uint32 console_text_color_hex;
 extern uint32 console_bg_color_hex;
 extern uint8 gui_cmd_buffer[GUI_CMD_BUFFER_SIZE];
 
+void draw_mouse_cursor();
 void draw_gui_console();
 
 void cons_init(void);
