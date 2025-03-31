@@ -43,8 +43,8 @@ static bool serial_exists;
 #define CURSOR_WIDTH 10
 #define CURSOR_HEIGHT 16
 #define CURSOR_COLOR MAKE_COLOR_HEX(255, 255, 255, 255)
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+#define SCREEN_WIDTH GPU.mode_info->width
+#define SCREEN_HEIGHT GPU.mode_info->height
 #define NEXT(idx) ((idx + 1) & (GUI_CMD_BUFFER_SIZE - 1))
 #define PREV(idx) ((idx - 1) & (GUI_CMD_BUFFER_SIZE - 1))
 const uint32 SHIFT_ROW = (FONT_SCALE * 8 + ROW_PADDING);
