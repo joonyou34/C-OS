@@ -321,9 +321,10 @@ kbd_proc_data(void)
 	{
 		uint8 mouse_data = inb(KBDATAP);
 		mouse_packet[mouse_byte_count++] = mouse_data;
-		if (mouse_byte_count == 3) {
-			bool leftButton   = mouse_packet[0] & 0x01;
-			bool rightButton  = mouse_packet[0] & 0x02;
+		if (mouse_byte_count == 3)
+		{
+			bool leftButton = mouse_packet[0] & 0x01;
+			bool rightButton = mouse_packet[0] & 0x02;
 			bool middleButton = mouse_packet[0] & 0x04;
 			int deltaX = (int8)mouse_packet[1];
 			int deltaY = (int8)mouse_packet[2];
@@ -331,24 +332,24 @@ kbd_proc_data(void)
 					mouse_packet[0], mouse_packet[1], mouse_packet[2],
 					leftButton, rightButton, middleButton, deltaX, deltaY);
 			mouse_byte_count = 0;
-		
+
 			// Update mouse coordinates.
 			// Adjust scaling if needed (e.g., multiply deltaX/deltaY by a factor)
 			mouse_x += deltaX;
-			mouse_y -= deltaY;  // Note: Y is often inverted
-		
+			mouse_y -= deltaY; // Note: Y is often inverted
+
 			// Clamp the mouse position to the screen boundaries.
 			if (mouse_x < 0)
 				mouse_x = 0;
 			else if (mouse_x >= SCREEN_WIDTH)
 				mouse_x = SCREEN_WIDTH - 1;
-		
+
 			if (mouse_y < 0)
 				mouse_y = 0;
 			else if (mouse_y >= SCREEN_HEIGHT)
 				mouse_y = SCREEN_HEIGHT - 1;
 		}
-		
+
 		return -1;
 	}
 	if ((status & KBS_DIB) == 0)
@@ -430,102 +431,44 @@ void kbd_intr(void)
 	cons_intr(kbd_proc_data);
 }
 
-
-// Wait until the input buffer (bit1 of port 0x64) is clear
+// Wait until the input buffer (bit 1 of port 0x64) is clear
 static void waitInputBufferClear(void)
 {
-    uint32 timeout = 100000;
-    while (inb(0x64) & 0x02)
-        if (--timeout == 0)
-            break;
+	uint32 timeout = 100000;
+	while (inb(0x64) & 0x02)
+		if (--timeout == 0)
+			break;
 }
 
-// Wait until the output buffer (bit0 of port 0x64) is full
+// Wait until the output buffer (bit 0 of port 0x64) is full
 static void waitOutputBufferFull(void)
 {
-    uint32 timeout = 100000;
-    while (!(inb(0x64) & 0x01))
-        if (--timeout == 0)
-            break;
+	uint32 timeout = 100000;
+	while (!(inb(0x64) & 0x01))
+		if (--timeout == 0)
+			break;
 }
 
 // Wait for an ACK (0xFA) from the mouse
 static void waitMouseAck(void)
 {
-    waitOutputBufferFull();
-    uint8 ack = inb(0x60);
-    if (ack != 0xFA)
-        cprintf("Mouse did not ACK command: 0x%x\n", ack);
-    else
-        cprintf("ACK received\n");
-}
-
-// Flush data from port 0x60
-static void flushOutputBuffer(void)
-{
-    while (inb(0x64) & 0x01)
-        inb(0x60);
+	waitOutputBufferFull();
+	uint8 ack = inb(0x60);
+	if (ack != 0xFA)
+		cprintf("*	Mouse did not ACK command: 0x%x\n", ack);
+	else
+		cprintf("*	Mouse ACK received\n");
 }
 
 void mouse_init(void)
 {
-    cprintf("Initializing PS/2 mouse...\n");
-    flushOutputBuffer();
-
-    // --- Step 1: Enable the Auxiliary (Mouse) Port ---
-    waitInputBufferClear();
-    outb(0x64, 0x20); // Read Command Byte
-    waitOutputBufferFull();
-    uint8 status = inb(0x60);
-    status |= 0x02;  // Enable IRQ12 for the mouse.
-    status &= ~0x20; // Ensure mouse clock is enabled.
-    waitInputBufferClear();
-    outb(0x64, 0x60); // Write Command Byte
-    waitInputBufferClear();
-    outb(0x60, status);
-    waitInputBufferClear();
-    outb(0x64, 0xA8); // Enable auxiliary device (mouse).
-
-    // --- Step 2: Initialize the Mouse ---
-    flushOutputBuffer();
-
-    // Reset the mouse:
-    waitInputBufferClear();
-    outb(0x64, 0xD4); // Next byte is for mouse.
-    waitInputBufferClear();
-    outb(0x60, 0xFF); // Reset command.
-    // Wait for ACK (0xFA) then self-test pass code (0xAA)
-    waitOutputBufferFull();
-    uint8 ack = inb(0x60);
-    if (ack != 0xFA)
-        cprintf("Mouse did not ACK reset command: 0x%x\n", ack);
-    waitOutputBufferFull();
-    uint8 self_test = inb(0x60);
-    if (self_test != 0xAA)
-        cprintf("Mouse self-test failed: 0x%x\n", self_test);
-
-    flushOutputBuffer();
-
-    // Set default settings (0xF6):
-    waitInputBufferClear();
-    outb(0x64, 0xD4);
-    waitInputBufferClear();
-    outb(0x60, 0xF6);
-    waitMouseAck();
-
-    // Enable packet streaming (0xF4):
-    waitInputBufferClear();
-    outb(0x64, 0xD4);
-    waitInputBufferClear();
-    outb(0x60, 0xF4);
-    waitMouseAck();
-    // Set initial mouse position.
+	outb(0x64, 0xD4);
+	waitInputBufferClear();
+	outb(0x60, 0xF4);
+	waitMouseAck();
 	mouse_x = SCREEN_WIDTH / 2;
-    mouse_y = SCREEN_HEIGHT / 2;
-
-    cprintf("Mouse initialization complete.\n");
+	mouse_y = SCREEN_HEIGHT / 2;
 }
-
 
 void kbd_init(void)
 {
@@ -676,15 +619,17 @@ void gpu_putc(int c)
 
 void draw_mouse_cursor(void)
 {
-    for (int y = 0; y < CURSOR_HEIGHT; y++) {
-        for (int x = 0; x < CURSOR_WIDTH; x++) {
-            if (x == y / 2) {
-                kdraw_pixel_hex(mouse_y + y, mouse_x + x, CURSOR_COLOR);
-            }
-        }
-    }
+	for (int y = 0; y < CURSOR_HEIGHT; y++)
+	{
+		for (int x = 0; x < CURSOR_WIDTH; x++)
+		{
+			if (x == y / 2)
+			{
+				kdraw_pixel_hex(mouse_y + y, mouse_x + x, CURSOR_COLOR);
+			}
+		}
+	}
 }
-
 
 void draw_gui_console()
 {

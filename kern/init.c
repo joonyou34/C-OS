@@ -145,12 +145,10 @@ void FOS_initialize(struct vbe_mode_info_structure *VESA_mode_info)
 		cprintf("*	IRQ0 (Clock): is Enabled\n");
 		// Enable KB Interrupt
 		irq_clear_mask(1);
-		cprintf("*	IRQ1 (Keyboard): is Enabled\n");
+		cprintf("*	IRQ1 (Mouse & Keyboard): is Enabled\n");
 		// Enable COM1 Interrupt
 		irq_clear_mask(4);
 		cprintf("*	IRQ4 (COM1): is Enabled\n");
-		irq_clear_mask(12);
-		cprintf("*	IRQ12 (Mouse): is Enabled\n");
 		// Enable Primary ATA Hard Disk Interrupt
 		//		irq_clear_mask(14);
 		//		cprintf("*	IRQ14 (Primary ATA Hard Disk): is Enabled\n");
