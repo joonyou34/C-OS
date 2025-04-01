@@ -349,7 +349,6 @@ kbd_proc_data(void)
 			else if (mouse_y >= SCREEN_HEIGHT)
 				mouse_y = SCREEN_HEIGHT - 1;
 		}
-
 		return -1;
 	}
 	if ((status & KBS_DIB) == 0)
