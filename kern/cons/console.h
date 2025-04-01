@@ -54,7 +54,7 @@ struct Channel KBDchannel;				//channel of waiting for a char from KB
 struct spinlock KBDlock;				//spinlock to protect the KBDchannel
 struct ksemaphore KBDsem;				//semaphore to manage KBD interrupts
 
-void kbd_intr(void); // irq 1
+void input_intr(void); // irq 1
 void serial_intr(void); // irq 4
 void keyboard_interrupt_handler();
 

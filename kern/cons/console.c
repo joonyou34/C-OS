@@ -308,15 +308,18 @@ static uint8 ctlmap[256] = {
 static uint8 *charcode[4] = {normalmap, shiftmap, ctlmap, ctlmap};
 
 /*
- * Get data from the keyboard.  If we finish a character, return it.  Else 0.
- * Return -1 if no data.
- */
+* Process keyboard and mouse data.
+* For keyboard input, returns a completed character when available, else returns 0.
+* For mouse input, processes the mouse packet (accumulating three bytes) and updates the cursor position.
+* Return -1 if no data.
+*/
 static int
-kbd_proc_data(void)
+input_proc_data(void)
 {
 	int c;
 	static uint32 shift;
-	uint8 status = inb(KBSTATP);
+	uint8 data, status = inb(KBSTATP);
+	// is 5th bit on? (data coming from mouse)
 	if (status & 0x20)
 	{
 		uint8 mouse_data = inb(KBDATAP);
@@ -333,17 +336,15 @@ kbd_proc_data(void)
 					leftButton, rightButton, middleButton, deltaX, deltaY);
 			mouse_byte_count = 0;
 
-			// Update mouse coordinates.
-			// Adjust scaling if needed (e.g., multiply deltaX/deltaY by a factor)
+			// Update mouse coordinates
 			mouse_x += deltaX;
-			mouse_y -= deltaY; // Note: Y is often inverted
+			mouse_y -= deltaY; // Y is inverted
 
-			// Clamp the mouse position to the screen boundaries.
+			// Clamp mouse to screen boundaries
 			if (mouse_x < 0)
 				mouse_x = 0;
 			else if (mouse_x >= SCREEN_WIDTH)
 				mouse_x = SCREEN_WIDTH - 1;
-
 			if (mouse_y < 0)
 				mouse_y = 0;
 			else if (mouse_y >= SCREEN_HEIGHT)
@@ -354,10 +355,7 @@ kbd_proc_data(void)
 	if ((status & KBS_DIB) == 0)
 		return -1;
 
-	uint8 data = inb(KBDATAP);
-
 	data = inb(KBDATAP);
-
 	if (data == 0xE0)
 	{
 		// E0 escape character
@@ -427,7 +425,7 @@ kbd_proc_data(void)
 
 void kbd_intr(void)
 {
-	cons_intr(kbd_proc_data);
+	cons_intr(input_proc_data);
 }
 
 // Wait until the input buffer (bit 1 of port 0x64) is clear
