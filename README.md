@@ -155,3 +155,32 @@ FOSv2 has changed [`kern/Makefrag`][kern-makefrag] in [`8e2612dc`][8e2612dc-diff
 [project]: https://github.com/YoussefRaafatNasry/fos-v2/projects/1/
 [compare]: https://github.com/YoussefRaafatNasry/fos-v2/compare/
 [new-issue]: https://github.com/YoussefRaafatNasry/fos-v2/issues/new/
+
+## 7. Our Course Project
+
+This fork of FOSv2 was developed as part of our Operating Systems course project at the Faculty of Computers and Information Sciences, Ain Shams University.
+
+We built on top of FOSv2 to implement and extend several core OS functionalities, including:
+
+- **Kernel Memory Management**
+  - `kmalloc`, `kfree`, `krealloc` with a first-fit allocation strategy
+- **User-Level Heap Management**
+  - `malloc`, `free`, and `realloc` with dynamic user-space memory allocation
+- **Concurrency Modules**
+  - `sleeplocks` for sleeping-based synchronization
+  - `semaphores` for resource counting and blocking
+  - `dynamic allocators` for both kernel and user space
+- **Testing and Debugging Tools**
+  - Designed and debugged in a VSCode + QEMU environment
+
+## 8. Graphics Support Contribution to FOS
+
+- Added support for **VESA BIOS Extensions (VBE)** to enable graphical video modes, transitioning the OS from text-only to graphical output.
+- Implemented a **framebuffer management system** allowing pixel-level control and color rendering.
+- Developed low-level drawing routines in **C and Assembly** for direct screen rendering.
+- Managed video memory mapping and synchronization to ensure stable and efficient display updates.
+- Extended kernel capabilities to initialize video modes and provide framebuffer access.
+- Laid the groundwork for future graphical user interface (GUI) development within the OS.
+
+![image](https://github.com/user-attachments/assets/d12589ae-66da-4284-a435-85621f660811)
+
