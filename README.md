@@ -176,10 +176,8 @@ We built on top of FOSv2 to implement and extend several core OS functionalities
 ## 8. Graphics Support Contribution to FOS
 
 - Added support for **VESA BIOS Extensions (VBE)** to enable graphical video modes, transitioning the OS from text-only to graphical output.
-- Implemented a **framebuffer management system** allowing pixel-level control and color rendering.
-- Developed low-level drawing routines in **C and Assembly** for direct screen rendering.
 - Managed video memory mapping and synchronization to ensure stable and efficient display updates.
-- Extended kernel capabilities to initialize video modes and provide framebuffer access.
+- Extended kernel capabilities to provide framebuffer access.
 - Laid the groundwork for future graphical user interface (GUI) development within the OS.
 
 ![image](https://github.com/user-attachments/assets/d12589ae-66da-4284-a435-85621f660811)
